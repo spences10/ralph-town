@@ -1,7 +1,7 @@
 # Ralph-GAS Project Instructions
 
 Two-agent TypeScript system using Claude Agent SDK with Daytona
-sandbox.
+sandbox. Exploring Ralph Loop + Gas Town patterns.
 
 ## Code Style
 
@@ -18,30 +18,9 @@ bun run build    # Compile TypeScript
 bun start        # Build + run compiled
 ```
 
-## Daytona SDK Notes
+## Key Documentation
 
-### uploadFile Signature
-
-```typescript
-// Correct: (content: Buffer, destination: string)
-await sandbox.fs.uploadFile(Buffer.from(content), '/path/to/file');
-
-// WRONG: (path, content) - parameters are reversed from intuition
-```
-
-### Supported Languages
-
-Only `python`, `typescript`, `javascript` - no native `bun` yet. Bun
-support coming via PR #3241.
-
-### Installing Bun in Sandbox
-
-```typescript
-await sandbox.process.executeCommand(
-	'curl -fsSL https://bun.sh/install | bash',
-);
-// Then add to PATH: export PATH="$HOME/.bun/bin:$PATH"
-```
+- `docs/RESEARCH.md` - Architecture exploration, patterns, open questions
 
 ## Research First
 
