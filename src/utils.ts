@@ -12,59 +12,74 @@ export const RED = `${ESC}31m`;
 /**
  * Render markdown-like syntax to terminal formatting
  */
-export function renderMarkdown(text: string, color?: string): string {
-  const colorCode = color ?? RESET;
+export function render_markdown(
+	text: string,
+	color?: string,
+): string {
+	const color_code = color ?? RESET;
 
-  // Bold: **text**
-  let result = text.replace(/\*\*(.+?)\*\*/g, `${BOLD}$1${RESET}${colorCode}`);
+	// Bold: **text**
+	let result = text.replace(
+		/\*\*(.+?)\*\*/g,
+		`${BOLD}$1${RESET}${color_code}`,
+	);
 
-  // Italic: *text* (but not if it's part of **)
-  result = result.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, `${ITALIC}$1${RESET}${colorCode}`);
+	// Italic: *text* (but not if it's part of **)
+	result = result.replace(
+		/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g,
+		`${ITALIC}$1${RESET}${color_code}`,
+	);
 
-  // Code: `text`
-  result = result.replace(/`(.+?)`/g, `${DIM}$1${RESET}${colorCode}`);
+	// Code: `text`
+	result = result.replace(
+		/`(.+?)`/g,
+		`${DIM}$1${RESET}${color_code}`,
+	);
 
-  return result;
+	return result;
 }
 
 /**
  * Print formatted output with role prefix
  */
-export function printMessage(role: 'pm' | 'dev' | 'system', message: string): void {
-  const prefix = {
-    pm: `${GREEN}[Project Manager]${RESET}`,
-    dev: `${CYAN}[Developer Agent]${RESET}`,
-    system: `${YELLOW}[System]${RESET}`,
-  };
+export function print_message(
+	role: 'pm' | 'dev' | 'system',
+	message: string,
+): void {
+	const prefix = {
+		pm: `${GREEN}[Project Manager]${RESET}`,
+		dev: `${CYAN}[Developer Agent]${RESET}`,
+		system: `${YELLOW}[System]${RESET}`,
+	};
 
-  console.log(`${prefix[role]} ${renderMarkdown(message)}`);
+	console.log(`${prefix[role]} ${render_markdown(message)}`);
 }
 
 /**
  * Print error message
  */
-export function printError(message: string): void {
-  console.error(`${RED}[Error]${RESET} ${message}`);
+export function print_error(message: string): void {
+	console.error(`${RED}[Error]${RESET} ${message}`);
 }
 
 /**
  * Extract developer tasks from PM response
  */
-export function extractDeveloperTasks(text: string): string[] {
-  const taskRegex = /<developer_task>([\s\S]*?)<\/developer_task>/g;
-  const tasks: string[] = [];
-  let match;
+export function extract_developer_tasks(text: string): string[] {
+	const task_regex = /<developer_task>([\s\S]*?)<\/developer_task>/g;
+	const tasks: string[] = [];
+	let match;
 
-  while ((match = taskRegex.exec(text)) !== null) {
-    tasks.push(match[1].trim());
-  }
+	while ((match = task_regex.exec(text)) !== null) {
+		tasks.push(match[1].trim());
+	}
 
-  return tasks;
+	return tasks;
 }
 
 /**
  * Check if PM response indicates task completion
  */
-export function isTaskComplete(text: string): boolean {
-  return text.includes('TASK_COMPLETE');
+export function is_task_complete(text: string): boolean {
+	return text.includes('TASK_COMPLETE');
 }
