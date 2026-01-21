@@ -27,6 +27,7 @@ autonomous agent assistance.
 | Developer Experience  | [developer-experience.md](research/developer-experience.md) | In progress |
 | Testing               | [testing.md](research/testing.md)                        | In progress |
 | Telemetry             | [telemetry.md](research/telemetry.md)                    | In progress |
+| Git Workflow          | [git-workflow.md](research/git-workflow.md)              | In progress |
 | Skills Planning       | [skills-planning.md](research/skills-planning.md)        | In progress |
 
 ---
