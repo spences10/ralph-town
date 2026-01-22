@@ -166,6 +166,53 @@ async function setup_git(
 		`cd ${REPO_PATH} && git config user.name "${author}" && git config user.email "${email}"`,
 	);
 
+	// Pre-install deps if package.json exists (saves agent iteration)
+	// Detect package manager from lockfile
+	const lockfile_check = await sandbox.process.executeCommand(
+		`cd ${REPO_PATH} && if [ -f pnpm-lock.yaml ]; then echo "pnpm"; elif [ -f bun.lockb ] || [ -f bun.lock ]; then echo "bun"; elif [ -f yarn.lock ]; then echo "yarn"; elif [ -f package-lock.json ]; then echo "npm"; elif [ -f package.json ]; then echo "npm"; fi`,
+	);
+	const pkg_manager = lockfile_check.result.trim();
+
+	if (pkg_manager) {
+		// Install package manager on-demand if not npm
+		if (pkg_manager === 'pnpm') {
+			print_message('system', 'Installing pnpm...');
+			await sandbox.process.executeCommand(
+				'npm install -g pnpm',
+				undefined,
+				undefined,
+				60,
+			);
+		} else if (pkg_manager === 'yarn') {
+			print_message('system', 'Installing yarn...');
+			await sandbox.process.executeCommand(
+				'npm install -g yarn',
+				undefined,
+				undefined,
+				60,
+			);
+		}
+
+		print_message(
+			'system',
+			`Installing dependencies (${pkg_manager})...`,
+		);
+		const install_result = await sandbox.process.executeCommand(
+			`cd ${REPO_PATH} && ${pkg_manager} install`,
+			undefined,
+			undefined,
+			120,
+		);
+		if (install_result.exitCode === 0) {
+			print_message('system', 'Dependencies installed');
+		} else {
+			print_message(
+				'system',
+				`Warning: ${pkg_manager} install failed (agent may retry)`,
+			);
+		}
+	}
+
 	print_message('system', `Git ready: ${git.feature_branch}`);
 }
 
@@ -263,6 +310,47 @@ async function create_pull_request(
 }
 
 /**
+ * Agent execution result with usage stats
+ */
+interface AgentExecutionResult {
+	output: string;
+	usage: {
+		input_tokens: number;
+		output_tokens: number;
+		total_cost_usd: number;
+	};
+}
+
+/**
+ * Parse usage JSON from agent output
+ */
+function parse_agent_usage(output: string): AgentExecutionResult {
+	const usage_match = output.match(
+		/__USAGE_JSON__(.+?)__USAGE_JSON__/,
+	);
+	let usage = {
+		input_tokens: 0,
+		output_tokens: 0,
+		total_cost_usd: 0,
+	};
+
+	if (usage_match) {
+		try {
+			usage = JSON.parse(usage_match[1]);
+		} catch {
+			// Fallback to zeros if parse fails
+		}
+	}
+
+	// Remove usage marker from output
+	const clean_output = output
+		.replace(/__USAGE_JSON__.+?__USAGE_JSON__/, '')
+		.trim();
+
+	return { output: clean_output, usage };
+}
+
+/**
  * Run the agent task in the sandbox
  * Each call creates a fresh Claude session (true Ralph pattern)
  *
@@ -273,7 +361,7 @@ async function run_agent_in_sandbox(
 	task: string,
 	working_dir?: string,
 	previous_failure?: string,
-): Promise<string> {
+): Promise<AgentExecutionResult> {
 	// Build the full prompt with context
 	let full_task = task;
 	if (previous_failure) {
@@ -299,7 +387,7 @@ async function run_agent_in_sandbox(
 		600,
 	);
 
-	return result.result;
+	return parse_agent_usage(result.result);
 }
 
 /**
@@ -464,16 +552,26 @@ export async function orchestrate(
 					iter_span,
 					feature.task,
 				);
-				const output = await run_agent_in_sandbox(
+				const agent_result = await run_agent_in_sandbox(
 					sandbox,
 					feature.task,
 					working_dir,
 					previous_failure,
 				);
 				if (agent_gen) {
-					agent_gen.end({ output: output.slice(0, 2000) });
+					agent_gen.end({
+						output: agent_result.output.slice(0, 2000),
+					});
 				}
-				print_message('dev', output.slice(0, 500) + '...');
+				print_message(
+					'dev',
+					agent_result.output.slice(0, 500) + '...',
+				);
+
+				// Track actual token usage
+				tokens_used +=
+					agent_result.usage.input_tokens +
+					agent_result.usage.output_tokens;
 
 				// Check backpressure
 				print_message('system', 'Checking backpressure...');
@@ -506,8 +604,8 @@ export async function orchestrate(
 						`${GREEN}PASS${RESET} - ${feature.id} complete`,
 					);
 				} else {
-					// Capture failure context for next iteration
-					const error_output = bp_result.result.slice(0, 500);
+					// Capture failure context for next iteration (1000 chars for better debugging)
+					const error_output = bp_result.result.slice(0, 1000);
 					previous_failure = `Backpressure command failed: ${feature.backpressure}\nOutput: ${error_output}`;
 					print_message(
 						'system',
@@ -523,12 +621,20 @@ export async function orchestrate(
 				);
 
 				// Run the agent
-				const output = await run_agent_in_sandbox(
+				const agent_result = await run_agent_in_sandbox(
 					sandbox,
 					config.task,
 					working_dir,
 				);
-				print_message('dev', output.slice(0, 500) + '...');
+				print_message(
+					'dev',
+					agent_result.output.slice(0, 500) + '...',
+				);
+
+				// Track actual token usage
+				tokens_used +=
+					agent_result.usage.input_tokens +
+					agent_result.usage.output_tokens;
 
 				// Check acceptance criteria
 				print_message('system', 'Checking acceptance criteria...');
@@ -578,9 +684,6 @@ export async function orchestrate(
 					} as OrchestrationResult;
 				}
 			}
-
-			// TODO: Track actual token usage from agent response
-			tokens_used += 1000; // Placeholder
 
 			// Budget check
 			if (tokens_used >= config.budget.max_tokens) {

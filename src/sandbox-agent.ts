@@ -32,10 +32,27 @@ Each execution is a fresh session - you have no memory of previous attempts.
 Complete the task fully and report what you did.`;
 
 /**
+ * Agent result with usage stats
+ */
+export interface AgentResult {
+	output: string;
+	usage: {
+		input_tokens: number;
+		output_tokens: number;
+		total_cost_usd: number;
+	};
+}
+
+/**
  * Run a developer task and stream output
  */
-export async function run_task(prompt: string): Promise<string> {
+export async function run_task(prompt: string): Promise<AgentResult> {
 	const results: string[] = [];
+	let usage = {
+		input_tokens: 0,
+		output_tokens: 0,
+		total_cost_usd: 0,
+	};
 
 	try {
 		for await (const message of query({
@@ -67,6 +84,12 @@ export async function run_task(prompt: string): Promise<string> {
 			} else if (message.type === 'result') {
 				if (message.subtype === 'success') {
 					results.push(message.result);
+					// Capture usage stats
+					usage = {
+						input_tokens: message.usage?.input_tokens ?? 0,
+						output_tokens: message.usage?.output_tokens ?? 0,
+						total_cost_usd: message.total_cost_usd ?? 0,
+					};
 				} else {
 					// Handle errors
 					const errors = 'errors' in message ? message.errors : [];
@@ -78,10 +101,10 @@ export async function run_task(prompt: string): Promise<string> {
 		const error_msg =
 			error instanceof Error ? error.message : String(error);
 		process.stderr.write(`Agent error: ${error_msg}\n`);
-		return `Error: ${error_msg}`;
+		return { output: `Error: ${error_msg}`, usage };
 	}
 
-	return results.join('\n');
+	return { output: results.join('\n'), usage };
 }
 
 // If run directly, execute the task from command line args or stdin
@@ -95,7 +118,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	run_task(task)
 		.then((result) => {
 			console.log('\n--- Task Complete ---');
-			console.log(result);
+			console.log(result.output);
+			// Output usage as parseable JSON on a separate line
+			console.log(
+				`\n__USAGE_JSON__${JSON.stringify(result.usage)}__USAGE_JSON__`,
+			);
 		})
 		.catch((error) => {
 			console.error('Fatal error:', error);
