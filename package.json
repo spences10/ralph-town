@@ -8,20 +8,27 @@
 		"build": "tsc",
 		"start": "bun run build && bun dist/index.js",
 		"dev": "bun src/index.ts",
+		"ralph": "bun src/orchestrator.ts",
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write .",
 		"format:check": "prettier --check ."
 	},
-	"keywords": ["claude", "agent-sdk", "daytona", "typescript", "bun"],
+	"keywords": [
+		"claude",
+		"agent-sdk",
+		"daytona",
+		"typescript",
+		"bun"
+	],
 	"license": "MIT",
 	"dependencies": {
-		"@anthropic-ai/claude-agent-sdk": "^0.2.14",
+		"@anthropic-ai/claude-agent-sdk": "^0.2.15",
 		"@daytonaio/sdk": "^0.134.0",
 		"dotenv": "^17.2.3"
 	},
 	"devDependencies": {
-		"@types/bun": "^1.2.5",
-		"@types/node": "^25.0.9",
+		"@types/bun": "^1.3.6",
+		"@types/node": "^25.0.10",
 		"prettier": "^3.8.1",
 		"typescript": "^5.9.3"
 	}
