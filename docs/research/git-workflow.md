@@ -6,7 +6,8 @@ Research on how sandbox agents interact with git repositories.
 
 ## Key Finding: Daytona SDK Has Built-in Git
 
-**Verified from source:** `daytonaio/daytona/libs/sdk-typescript/src/Git.ts`
+**Verified from source:**
+`daytonaio/daytona/libs/sdk-typescript/src/Git.ts`
 
 The Daytona SDK provides full git operations **with per-operation
 authentication**. No need to store credentials in the sandbox.
@@ -15,16 +16,16 @@ authentication**. No need to store credentials in the sandbox.
 
 ## Available Git Methods
 
-| Method | Signature | Auth Support |
-|--------|-----------|--------------|
-| `clone` | `(url, path, branch?, commitId?, username?, password?)` | ✅ |
-| `add` | `(path, files[])` | N/A |
-| `commit` | `(path, message, author, email, allowEmpty?)` | N/A |
-| `createBranch` | `(path, name)` | N/A |
-| `push` | `(path, username?, password?)` | ✅ |
-| `pull` | `(path, username?, password?)` | ✅ |
-| `status` | `(path)` | N/A |
-| `branches` | `(path)` | N/A |
+| Method         | Signature                                               | Auth Support |
+| -------------- | ------------------------------------------------------- | ------------ |
+| `clone`        | `(url, path, branch?, commitId?, username?, password?)` | ✅           |
+| `add`          | `(path, files[])`                                       | N/A          |
+| `commit`       | `(path, message, author, email, allowEmpty?)`           | N/A          |
+| `createBranch` | `(path, name)`                                          | N/A          |
+| `push`         | `(path, username?, password?)`                          | ✅           |
+| `pull`         | `(path, username?, password?)`                          | ✅           |
+| `status`       | `(path)`                                                | N/A          |
+| `branches`     | `(path)`                                                | N/A          |
 
 **Source:** Verified from actual SDK source code.
 
@@ -42,15 +43,11 @@ await sandbox.git.clone(
 	'main', // branch
 	undefined, // commitId
 	'username', // git username
-	'ghp_xxxx' // GitHub token
+	'ghp_xxxx', // GitHub token
 );
 
 // Push changes - pass token at push time
-await sandbox.git.push(
-	'workspace/repo',
-	'username',
-	'ghp_xxxx'
-);
+await sandbox.git.push('workspace/repo', 'username', 'ghp_xxxx');
 ```
 
 **Implication:** Orchestrator holds credentials, passes them to
@@ -78,11 +75,13 @@ Orchestrator                    Sandbox
 ```
 
 **Pros:**
+
 - Credentials passed per-operation, not stored
 - Uses SDK methods, not shell commands
 - Clean audit trail (SDK logs operations)
 
 **Cons:**
+
 - Orchestrator must coordinate git operations
 
 ---
@@ -103,10 +102,12 @@ Orchestrator                    Sandbox
 ```
 
 **Pros:**
+
 - Zero credential exposure to sandbox
 - Orchestrator has full git control
 
 **Cons:**
+
 - File sync overhead
 - More complex orchestrator logic
 
@@ -117,6 +118,7 @@ Orchestrator                    Sandbox
 **Use Option A with SDK git methods.**
 
 Rationale:
+
 1. Daytona SDK provides native git support
 2. Credentials are per-operation, not persistent
 3. Simpler than file sync approach
@@ -166,9 +168,60 @@ From GitHub issues research:
 
 ---
 
-## To Research Further
+## PR Creation (Researched)
 
-- [ ] How to handle PR creation (gh CLI in sandbox vs orchestrator?)
-- [ ] Network policies affecting git access per sandbox tier
-- [ ] Token scopes needed for clone/push operations
-- [ ] Handling git conflicts in the loop
+**GitHub API is whitelisted on all tiers** including preview.
+
+From
+[Daytona network docs](https://www.daytona.io/docs/en/network-limits/):
+`api.github.com` is in the essential services allowlist.
+
+**Options:**
+
+1. **gh CLI from sandbox** - requires gh installed in image
+2. **Orchestrator creates PR** - uses gh CLI locally after push
+
+Recommended: Orchestrator creates PR after successful push.
+
+```typescript
+// After sandbox.git.push() succeeds
+await exec(
+	`gh pr create --repo ${repo} --head ${branch} --title "${title}"`,
+);
+```
+
+---
+
+## Network Access by Tier (Researched)
+
+| Tier | Git Access | GitHub API | Notes                    |
+| ---- | ---------- | ---------- | ------------------------ |
+| 1-2  | ✅         | ✅         | Whitelisted domains only |
+| 3-4  | ✅         | ✅         | Full internet access     |
+
+**Whitelisted for all tiers:**
+
+- `github.com`, `api.github.com`
+- `gitlab.com`, `bitbucket.org`
+- npm, PyPI, Docker registries
+- Anthropic, OpenAI APIs
+
+---
+
+## Token Scopes (Researched)
+
+For GitHub fine-grained PAT:
+
+| Scope          | Needed For  |
+| -------------- | ----------- |
+| Contents: R/W  | Clone, push |
+| Pull requests  | Create PR   |
+| Metadata: Read | Repo info   |
+
+---
+
+## To Do
+
+- [ ] Implement git workflow in orchestrator
+- [ ] Handle git conflicts in the loop
+- [ ] Add PR template support
