@@ -4,74 +4,79 @@ How the orchestrator relates to Daytona sandboxes.
 
 ---
 
-## Option A: Orchestrator LOCAL → spawns Daytona sandboxes
+## Validated: Option A - Local Orchestrator
 
 ```
 ┌─────────────────┐
 │  Local Machine  │
 │  (Orchestrator) │
+│  bun ralph      │
 └────────┬────────┘
-         │ spawns
-    ┌────┴────┬────────┐
-    ▼         ▼        ▼
-┌───────┐ ┌───────┐ ┌───────┐
-│Agent 1│ │Agent 2│ │Agent 3│
-│Sandbox│ │Sandbox│ │Sandbox│
-└───────┘ └───────┘ └───────┘
+         │ creates sandbox
+         ▼
+┌─────────────────┐
+│ Daytona Sandbox │
+│  ┌───────────┐  │
+│  │   Agent   │  │
+│  │ (tsx/npm) │  │
+│  └───────────┘  │
+└─────────────────┘
 ```
 
-**Pros**: Full control, easy inter-sandbox coordination
-**Cons**: Local machine as bottleneck
+**Why this works:**
+
+- Simple to implement and debug
+- Full control over the loop from local machine
+- Agent runs in isolated sandbox
+- No callback complexity
+
+**Current flow:**
+
+1. Local orchestrator reads `ralph.json`
+2. Creates Daytona sandbox
+3. Uploads agent code
+4. Installs deps (npm - works on preview tier)
+5. Runs agent with task
+6. Checks acceptance criteria
+7. Loops until done or max iterations
+8. Cleans up sandbox
 
 ---
 
-## Option B: Orchestrator IN Daytona → child processes
+## Future Options (Tier 3+)
 
-```
-┌─────────────────────────┐
-│    Daytona Sandbox      │
-│  ┌───────────────────┐  │
-│  │   Orchestrator    │  │
-│  └────────┬──────────┘  │
-│           │ spawns      │
-│     ┌─────┴─────┐       │
-│     ▼           ▼       │
-│  ┌──────┐  ┌──────┐     │
-│  │Proc 1│  │Proc 2│     │
-│  └──────┘  └──────┘     │
-└─────────────────────────┘
-```
+### Option B: Orchestrator IN Daytona
 
-**Pros**: Fully containerized
-**Cons**: Limited - can't spawn sibling sandboxes
+When we have higher tier access:
 
----
+- Run orchestrator itself in Daytona
+- Use custom snapshots with pre-installed deps
+- Faster iteration (~10s saved per run)
+- Could spawn sibling sandboxes via API
 
-## Option C: Orchestrator IN Daytona → callbacks to spawn siblings
+### Option C: MCP Server Interface
 
-```
-┌───────────────────┐     ┌───────────────┐
-│  Daytona Sandbox  │     │ Local/API     │
-│  (Orchestrator)   │────▶│ (Spawner)     │
-└───────────────────┘     └───────┬───────┘
-                                  │ spawns
-                            ┌─────┴─────┐
-                            ▼           ▼
-                        ┌───────┐   ┌───────┐
-                        │Agent 1│   │Agent 2│
-                        │Sandbox│   │Sandbox│
-                        └───────┘   └───────┘
-```
+As described in developer-experience.md:
 
-**Pros**: Best of both worlds
-**Cons**: Complex, needs callback mechanism
+- Claude Code calls MCP tool
+- MCP server runs orchestration
+- Results stream back to session
 
 ---
 
-## Current Leaning
+## Validated Constraints
 
-**Option B with orchestrator in Daytona** - fully containerized, no
-local bottleneck. Child agents run as processes within the sandbox.
+| Constraint               | Impact                          |
+| ------------------------ | ------------------------------- |
+| Preview tier internet    | Must use npm, not bun/curl      |
+| No snapshot creation     | ~10s npm install each run       |
+| Memory limits (10-20 GB) | Single sandbox at a time        |
+| Single agent per sandbox | No parallel agents in one box   |
 
-Open question: Can we spawn sibling sandboxes from within a sandbox
-if needed?
+---
+
+## Decision
+
+**Option A is the validated working approach.** Simple, functional, and
+works within preview tier constraints. Can evolve to Option B/C when
+resources allow.

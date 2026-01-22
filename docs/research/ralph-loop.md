@@ -4,6 +4,12 @@ The iterative acceptance criteria loop.
 
 ---
 
+## Status: Validated
+
+The core loop is implemented and working. See `src/orchestrator.ts`.
+
+---
+
 ## Concept
 
 Named after the "Ralph Wiggum loop" - a bash loop that spins up
@@ -11,41 +17,75 @@ Claude Code instances and iterates until the task is done.
 
 ---
 
-## Core Loop Structure
+## Core Loop Structure (Implemented)
 
 ```typescript
-while (!acceptance_criteria_met(result)) {
-	result = await agent.run(task, context);
-	iteration++;
+while (iterations < config.max_iterations) {
+	// Run agent
+	const output = await run_agent_in_sandbox(sandbox, config.task);
 
-	if (iteration >= max_iterations) break;
-	if (budget_exhausted()) break;
+	// Check criteria
+	const criteria_met = await check_all_criteria(
+		sandbox,
+		config.acceptance_criteria,
+	);
+
+	// Exit if all pass
+	if (criteria_met.every((m) => m)) {
+		return { status: 'success', ... };
+	}
+
+	// Budget check
+	if (tokens_used >= config.budget.max_tokens) {
+		return { status: 'budget_exhausted', ... };
+	}
+
+	iterations++;
 }
+return { status: 'max_iterations', ... };
 ```
 
 ---
 
-## ralph.json Schema (Draft)
+## ralph.json Schema (Validated)
 
 ```json
 {
-	"task": "Refactor authentication module",
+	"task": "Create a hello.txt file with content 'Hello from Ralph'",
 	"acceptance_criteria": [
-		"All tests pass",
-		"No TypeScript errors",
-		"Code review checklist complete"
+		{
+			"type": "file_exists",
+			"path": "/home/daytona/hello.txt"
+		}
 	],
-	"max_iterations": 5,
+	"max_iterations": 3,
 	"budget": {
-		"max_tokens": 50000,
-		"max_cost_usd": 1.0
+		"max_tokens": 10000
 	}
 }
 ```
 
+See `src/types.ts` for TypeScript definitions.
+
 ---
 
-## Exit Conditions
+## Acceptance Criteria Types (Implemented)
+
+| Type               | Description                      |
+| ------------------ | -------------------------------- |
+| `file_exists`      | Check if file exists at path     |
+| `command_succeeds` | Run command, check exit code = 0 |
+
+**Future types to add:**
+
+- `tests_pass` - run test suite
+- `no_type_errors` - run tsc --noEmit
+- `lint_clean` - run linter
+- `contains_text` - file contains specific text
+
+---
+
+## Exit Conditions (Implemented)
 
 1. **Success** - all acceptance criteria met
 2. **Max iterations** - safety limit reached
@@ -54,10 +94,10 @@ while (!acceptance_criteria_met(result)) {
 
 ---
 
-## To Research
+## To Do
 
-- [ ] Acceptance criteria file format (ralph.json schema?)
-- [ ] How to evaluate "task done" programmatically
+- [ ] Real token tracking from agent response
+- [ ] Context passing between iterations (what failed)
 - [ ] Backpressure handling: pause/retry on rate limits
 - [ ] State persistence between iterations
-- [ ] How does the original Ralph Wiggum loop work exactly?
+- [ ] More acceptance criteria types
