@@ -9,6 +9,15 @@ import { exec } from 'child_process';
 import 'dotenv/config';
 import { readFileSync } from 'fs';
 import { promisify } from 'util';
+import {
+	create_agent_generation,
+	create_iteration_span,
+	create_ralph_trace,
+	finalize_trace,
+	flush_telemetry,
+	init_telemetry,
+	record_backpressure,
+} from './telemetry.js';
 import type {
 	AcceptanceCriterion,
 	Feature,
@@ -302,6 +311,9 @@ async function run_agent_in_sandbox(
 export async function orchestrate(
 	config: RalphConfig,
 ): Promise<OrchestrationResult> {
+	// Initialize telemetry
+	init_telemetry();
+
 	const start_time = Date.now();
 	let iterations = 0;
 	let tokens_used = 0;
@@ -310,6 +322,17 @@ export async function orchestrate(
 	// Determine mode
 	const is_feature_mode =
 		config.features && config.features.length > 0;
+
+	// Create telemetry trace
+	const telem_trace = create_ralph_trace({
+		task: config.task,
+		features: config.features,
+		max_iterations: is_feature_mode
+			? (config.max_iterations_per_feature || 3) *
+				config.features!.length
+			: config.max_iterations || 3,
+		budget_tokens: config.budget.max_tokens,
+	});
 	const max_iter = is_feature_mode
 		? (config.max_iterations_per_feature || 3) *
 			config.features!.length
@@ -402,7 +425,7 @@ export async function orchestrate(
 						);
 					}
 
-					return {
+					const result: OrchestrationResult = {
 						status: 'success',
 						iterations,
 						criteria_met: config.features.map((f) => f.passes),
@@ -411,7 +434,16 @@ export async function orchestrate(
 							duration_ms: Date.now() - start_time,
 						},
 						pr_url,
-					} as OrchestrationResult;
+					};
+					finalize_trace(telem_trace, {
+						status: result.status,
+						iterations: result.iterations,
+						tokens_used: result.metrics.tokens_used,
+						duration_ms: result.metrics.duration_ms,
+						features_completed: config.features.length,
+						pr_url: result.pr_url,
+					});
+					return result;
 				}
 
 				print_message(
@@ -420,13 +452,27 @@ export async function orchestrate(
 				);
 				print_message('system', `Task: ${feature.description}`);
 
+				// Create telemetry span for this iteration
+				const iter_span = create_iteration_span(
+					telem_trace,
+					iterations,
+					feature.id,
+				);
+
 				// Run agent for this feature (fresh Claude session each time)
+				const agent_gen = create_agent_generation(
+					iter_span,
+					feature.task,
+				);
 				const output = await run_agent_in_sandbox(
 					sandbox,
 					feature.task,
 					working_dir,
 					previous_failure,
 				);
+				if (agent_gen) {
+					agent_gen.end({ output: output.slice(0, 2000) });
+				}
 				print_message('dev', output.slice(0, 500) + '...');
 
 				// Check backpressure
@@ -438,6 +484,18 @@ export async function orchestrate(
 					120,
 				);
 				const passed = bp_result.exitCode === 0;
+
+				// Record backpressure result in telemetry
+				record_backpressure(
+					iter_span,
+					feature.backpressure,
+					passed,
+					bp_result.result,
+				);
+
+				if (iter_span) {
+					iter_span.end();
+				}
 
 				if (passed) {
 					feature.passes = true;
@@ -579,6 +637,9 @@ export async function orchestrate(
 			print_message('system', 'Cleaning up sandbox...');
 			await daytona.delete(sandbox);
 		}
+
+		// Flush telemetry
+		await flush_telemetry();
 	}
 }
 

@@ -2,6 +2,8 @@
 
 Capturing data from sandbox agents to improve the workflow.
 
+**Status: Implemented** - See `src/telemetry.ts`
+
 ---
 
 ## Why Telemetry Matters
@@ -123,24 +125,24 @@ exporters:
 
 ### Per Agent Call
 
-| Metric             | Type    | Purpose                    |
-| ------------------ | ------- | -------------------------- |
-| `tokens_input`     | counter | Track input costs          |
-| `tokens_output`    | counter | Track output costs         |
-| `duration_ms`      | gauge   | Latency measurement        |
-| `tool_calls`       | counter | How many tools used        |
-| `iteration`        | gauge   | Which loop iteration       |
-| `success`          | boolean | Did it complete correctly  |
+| Metric          | Type    | Purpose                   |
+| --------------- | ------- | ------------------------- |
+| `tokens_input`  | counter | Track input costs         |
+| `tokens_output` | counter | Track output costs        |
+| `duration_ms`   | gauge   | Latency measurement       |
+| `tool_calls`    | counter | How many tools used       |
+| `iteration`     | gauge   | Which loop iteration      |
+| `success`       | boolean | Did it complete correctly |
 
 ### Per Task (Ralph Loop)
 
-| Metric             | Type    | Purpose                    |
-| ------------------ | ------- | -------------------------- |
-| `total_iterations` | counter | How many loops needed      |
-| `total_tokens`     | counter | Full task token cost       |
-| `total_cost_usd`   | gauge   | Estimated dollar cost      |
-| `criteria_met`     | boolean | Did acceptance pass        |
-| `exit_reason`      | string  | success/max_iter/budget    |
+| Metric             | Type    | Purpose                 |
+| ------------------ | ------- | ----------------------- |
+| `total_iterations` | counter | How many loops needed   |
+| `total_tokens`     | counter | Full task token cost    |
+| `total_cost_usd`   | gauge   | Estimated dollar cost   |
+| `criteria_met`     | boolean | Did acceptance pass     |
+| `exit_reason`      | string  | success/max_iter/budget |
 
 ### Trace Structure
 
@@ -181,10 +183,76 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 ---
 
+## Current Implementation
+
+See `src/telemetry.ts` for the implementation.
+
+**Approach:** Orchestrator-side telemetry only. Decided against passing
+Langfuse credentials into sandbox - adds complexity for minimal
+benefit since orchestrator already captures agent execution data.
+
+**Actual trace structure:**
+
+```
+ralph-loop (trace)
+├── iteration-1 (span)
+│   ├── agent-execution (generation)
+│   └── backpressure-check (span)
+├── iteration-2 (span)
+│   └── ...
+└── final metadata (status, tokens, duration)
+```
+
+---
+
+## Querying Data
+
+### SDK Methods (TypeScript)
+
+```typescript
+import { LangfuseClient } from '@langfuse/client';
+
+const langfuse = new LangfuseClient();
+
+// List traces with filters
+const traces = await langfuse.api.trace.list({
+	tags: ['ralph-gas'],
+	limit: 100,
+	fromTimestamp: '2025-01-01T00:00:00Z',
+	orderBy: 'timestamp.desc',
+});
+
+// Get single trace with full details
+const trace = await langfuse.api.trace.get('trace-id');
+```
+
+**Available filters:** `userId`, `sessionId`, `name`, `tags`,
+`version`, `release`, `environment`, `fromTimestamp`, `toTimestamp`,
+plus advanced JSON filters for latency, tokens, costs.
+
+### Metrics API (aggregated)
+
+```bash
+curl -H "Authorization: Basic <AUTH>" \
+  -G --data-urlencode 'query={
+    "view": "traces",
+    "metrics": [{"measure": "count", "aggregation": "count"}],
+    "dimensions": [{"field": "name"}],
+    "fromTimestamp": "...",
+    "toTimestamp": "..."
+  }' \
+  https://cloud.langfuse.com/api/public/metrics
+```
+
+Gets p50/p90 latency, token totals, costs grouped by dimensions.
+
+---
+
 ## To Research
 
-- [ ] Langfuse Claude Agent SDK integration specifics
+- [x] Langfuse Claude Agent SDK integration - using direct API
+- [x] How to pass telemetry into sandbox - decided: don't, orchestrator
+      captures agent output
 - [ ] Self-hosting Langfuse vs cloud
 - [ ] Cost of Langfuse cloud for team usage
-- [ ] How to pass telemetry config into Daytona sandbox
 - [ ] Correlation IDs across orchestrator → agent
