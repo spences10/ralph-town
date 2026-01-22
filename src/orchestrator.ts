@@ -80,19 +80,6 @@ async function check_all_criteria(
 }
 
 /**
- * Check a feature's backpressure command
- */
-async function check_backpressure(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	feature: Feature,
-): Promise<boolean> {
-	const result = await sandbox.process.executeCommand(
-		feature.backpressure,
-	);
-	return result.exitCode === 0;
-}
-
-/**
  * Get the next incomplete feature
  */
 function get_next_feature(features: Feature[]): Feature | null {
@@ -268,25 +255,39 @@ async function create_pull_request(
 
 /**
  * Run the agent task in the sandbox
+ * Each call creates a fresh Claude session (true Ralph pattern)
+ *
+ * @param previous_failure - Optional context about what failed in previous iteration
  */
 async function run_agent_in_sandbox(
 	sandbox: Awaited<ReturnType<Daytona['create']>>,
 	task: string,
 	working_dir?: string,
+	previous_failure?: string,
 ): Promise<string> {
+	// Build the full prompt with context
+	let full_task = task;
+	if (previous_failure) {
+		full_task = `${task}\n\nNOTE: Previous attempt failed. ${previous_failure}`;
+	}
+
 	print_message('system', `Running agent with task: ${task}`);
 
-	const escaped_task = task.replace(/"/g, '\\"');
+	const escaped_task = full_task
+		.replace(/"/g, '\\"')
+		.replace(/\n/g, '\\n');
 	// tsx and claude-agent-sdk are globally installed via RALPH_IMAGE
 	// NODE_PATH needed so globally installed modules are resolvable
 	const work_dir = working_dir || '/home/daytona';
 	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx /home/daytona/sandbox-agent.ts "${escaped_task}"`;
 
+	// Agent tasks can take several minutes - Claude API calls + file operations
+	// 600 seconds (10 min) allows for complex multi-step tasks
 	const result = await sandbox.process.executeCommand(
 		command,
 		undefined,
 		undefined,
-		120,
+		600,
 	);
 
 	return result.result;
@@ -369,6 +370,9 @@ export async function orchestrate(
 				: REPO_PATH;
 		}
 
+		// Track previous failure for context passing
+		let previous_failure: string | undefined;
+
 		// Main loop - feature list mode or single task mode
 		while (iterations < max_iter) {
 			iterations++;
@@ -416,26 +420,37 @@ export async function orchestrate(
 				);
 				print_message('system', `Task: ${feature.description}`);
 
-				// Run agent for this feature
+				// Run agent for this feature (fresh Claude session each time)
 				const output = await run_agent_in_sandbox(
 					sandbox,
 					feature.task,
 					working_dir,
+					previous_failure,
 				);
 				print_message('dev', output.slice(0, 500) + '...');
 
 				// Check backpressure
 				print_message('system', 'Checking backpressure...');
-				const passed = await check_backpressure(sandbox, feature);
+				const bp_result = await sandbox.process.executeCommand(
+					feature.backpressure,
+					undefined,
+					undefined,
+					120,
+				);
+				const passed = bp_result.exitCode === 0;
 
 				if (passed) {
 					feature.passes = true;
 					features_completed++;
+					previous_failure = undefined; // Clear failure context
 					print_message(
 						'system',
 						`${GREEN}PASS${RESET} - ${feature.id} complete`,
 					);
 				} else {
+					// Capture failure context for next iteration
+					const error_output = bp_result.result.slice(0, 500);
+					previous_failure = `Backpressure command failed: ${feature.backpressure}\nOutput: ${error_output}`;
 					print_message(
 						'system',
 						`FAIL - ${feature.id} backpressure: ${feature.backpressure}`,

@@ -7,25 +7,29 @@
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
-const PREVIEW_URL = process.env.PREVIEW_URL ?? '';
+const WORKSPACE = '/home/daytona/workspace';
 
 const system_prompt = `You are a Developer Agent running in a Daytona sandbox.
 
-IMPORTANT PATHS:
-- Use /home/daytona as your working directory for all file operations
-- Do NOT use /workspace
+## Working Directory
+Your workspace is: ${WORKSPACE}
+Always work within this directory.
 
-PREVIEW URLS:
-- Your public preview URL for port 80 is: ${PREVIEW_URL}
-- Other services follow the same pattern on different ports
+## Your Task
+You will receive a specific task to complete. Focus on that task only.
+Each execution is a fresh session - you have no memory of previous attempts.
 
-You have full access to:
-- Read, write, and edit files
-- Run bash commands
-- Search the codebase with Glob and Grep
+## Important Rules
+- DO NOT implement placeholder or stub code - full implementations only
+- Complete the task thoroughly before finishing
+- If the task involves code, make sure it compiles/builds
 
-When you start a dev server, report the preview URL to the user.
-Complete tasks thoroughly and report results clearly.`;
+## Tools Available
+- Read, Write, Edit files
+- Bash commands (npm, pnpm, git, curl, etc.)
+- Glob and Grep for searching
+
+Complete the task fully and report what you did.`;
 
 /**
  * Run a developer task and stream output
