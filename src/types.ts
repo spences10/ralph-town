@@ -2,8 +2,17 @@
  * Ralph-GAS type definitions
  */
 
-// Acceptance criteria types (legacy single-task mode)
-export type AcceptanceCriterion =
+// Ralph acceptance criterion (primary format)
+export interface RalphCriterion {
+	id: string;
+	description: string;
+	steps: string[]; // implementation steps for the agent
+	backpressure: string; // command to verify completion
+	passes: boolean;
+}
+
+// Legacy acceptance criteria types (single-task mode)
+export type LegacyAcceptanceCriterion =
 	| FileExistsCriterion
 	| CommandSucceedsCriterion;
 
@@ -15,15 +24,6 @@ export interface FileExistsCriterion {
 export interface CommandSucceedsCriterion {
 	type: 'command_succeeds';
 	command: string;
-}
-
-// Feature list pattern (multi-task mode)
-export interface Feature {
-	id: string;
-	description: string;
-	task: string;
-	backpressure: string; // command to verify completion
-	passes: boolean;
 }
 
 // Repository configuration for git workflow
@@ -46,14 +46,14 @@ export interface GitConfig {
 
 // Ralph configuration
 export interface RalphConfig {
-	// Single task mode (legacy)
-	task?: string;
-	acceptance_criteria?: AcceptanceCriterion[];
-	max_iterations?: number;
+	// Ralph pattern (primary) - list of acceptance criteria with steps
+	acceptance_criteria?: RalphCriterion[];
+	max_iterations_per_criterion?: number; // default: 3
 
-	// Feature list mode (recommended)
-	features?: Feature[];
-	max_iterations_per_feature?: number;
+	// Legacy single task mode
+	task?: string;
+	legacy_criteria?: LegacyAcceptanceCriterion[];
+	max_iterations?: number;
 
 	// Git workflow
 	repository?: RepositoryConfig;

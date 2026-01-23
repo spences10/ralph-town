@@ -19,11 +19,11 @@ import {
 	record_backpressure,
 } from './telemetry.js';
 import type {
-	AcceptanceCriterion,
-	Feature,
 	GitConfig,
+	LegacyAcceptanceCriterion,
 	OrchestrationResult,
 	RalphConfig,
+	RalphCriterion,
 	RepositoryConfig,
 } from './types.js';
 import { GREEN, print_error, print_message, RESET } from './utils.js';
@@ -50,11 +50,11 @@ const RALPH_IMAGE = Image.base('node:22-slim').dockerfileCommands([
 ]);
 
 /**
- * Check a single acceptance criterion in the sandbox
+ * Check a single legacy acceptance criterion in the sandbox
  */
-async function check_criterion(
+async function check_legacy_criterion(
 	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	criterion: AcceptanceCriterion,
+	criterion: LegacyAcceptanceCriterion,
 ): Promise<boolean> {
 	switch (criterion.type) {
 		case 'file_exists': {
@@ -75,24 +75,36 @@ async function check_criterion(
 }
 
 /**
- * Check all acceptance criteria
+ * Check all legacy acceptance criteria
  */
-async function check_all_criteria(
+async function check_all_legacy_criteria(
 	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	criteria: AcceptanceCriterion[],
+	criteria: LegacyAcceptanceCriterion[],
 ): Promise<boolean[]> {
 	const results: boolean[] = [];
 	for (const criterion of criteria) {
-		results.push(await check_criterion(sandbox, criterion));
+		results.push(await check_legacy_criterion(sandbox, criterion));
 	}
 	return results;
 }
 
 /**
- * Get the next incomplete feature
+ * Get the next incomplete criterion (ralph pattern)
  */
-function get_next_feature(features: Feature[]): Feature | null {
-	return features.find((f) => !f.passes) || null;
+function get_next_criterion(
+	criteria: RalphCriterion[],
+): RalphCriterion | null {
+	return criteria.find((c) => !c.passes) || null;
+}
+
+/**
+ * Convert steps array to task string for agent
+ */
+function steps_to_task(criterion: RalphCriterion): string {
+	const steps_text = criterion.steps
+		.map((s, i) => `${i + 1}. ${s}`)
+		.join('\n');
+	return `${criterion.description}\n\nSteps:\n${steps_text}`;
 }
 
 /**
@@ -393,8 +405,8 @@ async function run_agent_in_sandbox(
 /**
  * Main orchestration loop
  * Supports two modes:
- * 1. Feature list mode (recommended): iterate through features until all pass
- * 2. Single task mode (legacy): run one task until acceptance criteria met
+ * 1. Ralph pattern (primary): iterate through acceptance_criteria with steps
+ * 2. Single task mode (legacy): run one task until legacy criteria met
  */
 export async function orchestrate(
 	config: RalphConfig,
@@ -405,32 +417,41 @@ export async function orchestrate(
 	const start_time = Date.now();
 	let iterations = 0;
 	let tokens_used = 0;
-	let features_completed = 0;
+	let criteria_completed = 0;
 
-	// Determine mode
-	const is_feature_mode =
-		config.features && config.features.length > 0;
+	// Determine mode - ralph pattern takes priority
+	const is_ralph_mode =
+		config.acceptance_criteria &&
+		config.acceptance_criteria.length > 0;
 
 	// Create telemetry trace
 	const telem_trace = create_ralph_trace({
 		task: config.task,
-		features: config.features,
-		max_iterations: is_feature_mode
-			? (config.max_iterations_per_feature || 3) *
-				config.features!.length
+		features: config.acceptance_criteria?.map((c) => ({
+			id: c.id,
+			description: c.description,
+			task: steps_to_task(c),
+			backpressure: c.backpressure,
+			passes: c.passes,
+		})),
+		max_iterations: is_ralph_mode
+			? (config.max_iterations_per_criterion || 3) *
+				config.acceptance_criteria!.length
 			: config.max_iterations || 3,
 		budget_tokens: config.budget.max_tokens,
 	});
-	const max_iter = is_feature_mode
-		? (config.max_iterations_per_feature || 3) *
-			config.features!.length
+	const max_iter = is_ralph_mode
+		? (config.max_iterations_per_criterion || 3) *
+			config.acceptance_criteria!.length
 		: config.max_iterations || 3;
 
-	if (is_feature_mode) {
-		const pending = config.features!.filter((f) => !f.passes).length;
+	if (is_ralph_mode) {
+		const pending = config.acceptance_criteria!.filter(
+			(c) => !c.passes,
+		).length;
 		print_message(
 			'system',
-			`Starting Ralph Loop: ${pending} features pending`,
+			`Starting Ralph Loop: ${pending} criteria pending`,
 		);
 	} else {
 		print_message(
@@ -484,26 +505,28 @@ export async function orchestrate(
 		// Track previous failure for context passing
 		let previous_failure: string | undefined;
 
-		// Main loop - feature list mode or single task mode
+		// Main loop - ralph pattern or legacy single task mode
 		while (iterations < max_iter) {
 			iterations++;
 
-			// Feature list mode
-			if (is_feature_mode && config.features) {
-				const feature = get_next_feature(config.features);
+			// Ralph pattern mode (primary)
+			if (is_ralph_mode && config.acceptance_criteria) {
+				const criterion = get_next_criterion(
+					config.acceptance_criteria,
+				);
 
-				// All features complete
-				if (!feature) {
+				// All criteria complete
+				if (!criterion) {
 					print_message(
 						'system',
-						`\n${GREEN}All ${config.features.length} features complete!${RESET}`,
+						`\n${GREEN}All ${config.acceptance_criteria.length} criteria complete!${RESET}`,
 					);
 
-					// Finalize git with all features
+					// Finalize git with all criteria
 					let pr_url: string | null = null;
 					if (has_git && config.repository && config.git) {
-						const summary = config.features
-							.map((f) => `- ${f.description}`)
+						const summary = config.acceptance_criteria
+							.map((c) => `- ${c.description}`)
 							.join('\n');
 						await finalize_git(sandbox, config.git, summary);
 						pr_url = await create_pull_request(
@@ -516,7 +539,9 @@ export async function orchestrate(
 					const result: OrchestrationResult = {
 						status: 'success',
 						iterations,
-						criteria_met: config.features.map((f) => f.passes),
+						criteria_met: config.acceptance_criteria.map(
+							(c) => c.passes,
+						),
 						metrics: {
 							tokens_used,
 							duration_ms: Date.now() - start_time,
@@ -528,7 +553,7 @@ export async function orchestrate(
 						iterations: result.iterations,
 						tokens_used: result.metrics.tokens_used,
 						duration_ms: result.metrics.duration_ms,
-						features_completed: config.features.length,
+						features_completed: config.acceptance_criteria.length,
 						pr_url: result.pr_url,
 					});
 					return result;
@@ -536,25 +561,25 @@ export async function orchestrate(
 
 				print_message(
 					'system',
-					`\n--- Feature: ${feature.id} (${features_completed}/${config.features.length}) ---`,
+					`\n--- Criterion: ${criterion.id} (${criteria_completed}/${config.acceptance_criteria.length}) ---`,
 				);
-				print_message('system', `Task: ${feature.description}`);
+				print_message('system', `Task: ${criterion.description}`);
 
 				// Create telemetry span for this iteration
 				const iter_span = create_iteration_span(
 					telem_trace,
 					iterations,
-					feature.id,
+					criterion.id,
 				);
 
-				// Run agent for this feature (fresh Claude session each time)
-				const agent_gen = create_agent_generation(
-					iter_span,
-					feature.task,
-				);
+				// Convert steps to task string for agent
+				const task = steps_to_task(criterion);
+
+				// Run agent for this criterion (fresh Claude session each time)
+				const agent_gen = create_agent_generation(iter_span, task);
 				const agent_result = await run_agent_in_sandbox(
 					sandbox,
-					feature.task,
+					task,
 					working_dir,
 					previous_failure,
 				);
@@ -576,7 +601,7 @@ export async function orchestrate(
 				// Check backpressure
 				print_message('system', 'Checking backpressure...');
 				const bp_result = await sandbox.process.executeCommand(
-					feature.backpressure,
+					criterion.backpressure,
 					undefined,
 					undefined,
 					120,
@@ -586,7 +611,7 @@ export async function orchestrate(
 				// Record backpressure result in telemetry
 				record_backpressure(
 					iter_span,
-					feature.backpressure,
+					criterion.backpressure,
 					passed,
 					bp_result.result,
 				);
@@ -596,25 +621,25 @@ export async function orchestrate(
 				}
 
 				if (passed) {
-					feature.passes = true;
-					features_completed++;
+					criterion.passes = true;
+					criteria_completed++;
 					previous_failure = undefined; // Clear failure context
 					print_message(
 						'system',
-						`${GREEN}PASS${RESET} - ${feature.id} complete`,
+						`${GREEN}PASS${RESET} - ${criterion.id} complete`,
 					);
 				} else {
 					// Capture failure context for next iteration (1000 chars for better debugging)
 					const error_output = bp_result.result.slice(0, 1000);
-					previous_failure = `Backpressure command failed: ${feature.backpressure}\nOutput: ${error_output}`;
+					previous_failure = `Backpressure command failed: ${criterion.backpressure}\nOutput: ${error_output}`;
 					print_message(
 						'system',
-						`FAIL - ${feature.id} backpressure: ${feature.backpressure}`,
+						`FAIL - ${criterion.id} backpressure: ${criterion.backpressure}`,
 					);
 				}
 			}
 			// Single task mode (legacy)
-			else if (config.task && config.acceptance_criteria) {
+			else if (config.task && config.legacy_criteria) {
 				print_message(
 					'system',
 					`\n--- Iteration ${iterations}/${max_iter} ---`,
@@ -638,14 +663,14 @@ export async function orchestrate(
 
 				// Check acceptance criteria
 				print_message('system', 'Checking acceptance criteria...');
-				const criteria_met = await check_all_criteria(
+				const criteria_results = await check_all_legacy_criteria(
 					sandbox,
-					config.acceptance_criteria,
+					config.legacy_criteria,
 				);
 
 				// Report status
-				config.acceptance_criteria.forEach((c, i) => {
-					const status = criteria_met[i]
+				config.legacy_criteria.forEach((c, i) => {
+					const status = criteria_results[i]
 						? `${GREEN}PASS${RESET}`
 						: `FAIL`;
 					print_message(
@@ -655,7 +680,7 @@ export async function orchestrate(
 				});
 
 				// Check if all criteria met
-				if (criteria_met.every((m) => m)) {
+				if (criteria_results.every((m) => m)) {
 					print_message(
 						'system',
 						`\n${GREEN}All acceptance criteria met!${RESET}`,
@@ -675,7 +700,7 @@ export async function orchestrate(
 					return {
 						status: 'success',
 						iterations,
-						criteria_met,
+						criteria_met: criteria_results,
 						metrics: {
 							tokens_used,
 							duration_ms: Date.now() - start_time,
@@ -691,8 +716,8 @@ export async function orchestrate(
 				return {
 					status: 'budget_exhausted',
 					iterations,
-					criteria_met: is_feature_mode
-						? config.features!.map((f) => f.passes)
+					criteria_met: is_ralph_mode
+						? config.acceptance_criteria!.map((c) => c.passes)
 						: [],
 					metrics: {
 						tokens_used,
@@ -707,12 +732,12 @@ export async function orchestrate(
 		return {
 			status: 'max_iterations',
 			iterations,
-			criteria_met: is_feature_mode
-				? config.features!.map((f) => f.passes)
-				: config.acceptance_criteria
-					? await check_all_criteria(
+			criteria_met: is_ralph_mode
+				? config.acceptance_criteria!.map((c) => c.passes)
+				: config.legacy_criteria
+					? await check_all_legacy_criteria(
 							sandbox,
-							config.acceptance_criteria,
+							config.legacy_criteria,
 						)
 					: [],
 			metrics: {
