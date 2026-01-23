@@ -44,11 +44,21 @@ export interface GitConfig {
 	pr_body?: string;
 }
 
+// Execution configuration
+export interface ExecutionConfig {
+	mode: 'sequential' | 'parallel';
+	max_concurrent?: number; // default: 3 for parallel mode
+	model?: 'haiku' | 'sonnet' | 'opus'; // default: 'sonnet'
+}
+
 // Ralph configuration
 export interface RalphConfig {
 	// Ralph pattern (primary) - list of acceptance criteria with steps
 	acceptance_criteria?: RalphCriterion[];
 	max_iterations_per_criterion?: number; // default: 3
+
+	// Execution mode
+	execution?: ExecutionConfig; // default: { mode: 'sequential' }
 
 	// Legacy single task mode
 	task?: string;
@@ -66,6 +76,17 @@ export interface RalphConfig {
 	};
 }
 
+// Per-criterion result (for parallel mode)
+export interface CriterionResult {
+	id: string;
+	status: 'success' | 'max_iterations' | 'error';
+	iterations: number;
+	tokens_used: number;
+	duration_ms: number;
+	pr_url?: string | null;
+	error?: string;
+}
+
 // Orchestration result
 export interface OrchestrationResult {
 	status: 'success' | 'max_iterations' | 'budget_exhausted' | 'error';
@@ -77,4 +98,6 @@ export interface OrchestrationResult {
 	};
 	error?: string;
 	pr_url?: string | null;
+	// Parallel mode results
+	criterion_results?: CriterionResult[];
 }

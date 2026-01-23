@@ -43,10 +43,21 @@ export interface AgentResult {
 	};
 }
 
+// Model mapping for the SDK
+// Using aliases - they auto-update to latest snapshots
+const MODEL_MAP: Record<string, string> = {
+	haiku: 'claude-haiku-4-5',
+	sonnet: 'claude-sonnet-4-5',
+	opus: 'claude-opus-4-5',
+};
+
 /**
  * Run a developer task and stream output
  */
-export async function run_task(prompt: string): Promise<AgentResult> {
+export async function run_task(
+	prompt: string,
+	model: string = 'sonnet',
+): Promise<AgentResult> {
 	const results: string[] = [];
 	let usage = {
 		input_tokens: 0,
@@ -54,11 +65,14 @@ export async function run_task(prompt: string): Promise<AgentResult> {
 		total_cost_usd: 0,
 	};
 
+	const model_id = MODEL_MAP[model] || MODEL_MAP.sonnet;
+
 	try {
 		for await (const message of query({
 			prompt,
 			options: {
 				systemPrompt: system_prompt,
+				model: model_id,
 				allowedTools: [
 					'Read',
 					'Write',
@@ -110,12 +124,14 @@ export async function run_task(prompt: string): Promise<AgentResult> {
 // If run directly, execute the task from command line args or stdin
 if (import.meta.url === `file://${process.argv[1]}`) {
 	const task = process.argv[2];
+	const model = process.argv[3] || 'sonnet';
+
 	if (!task) {
-		console.error('Usage: sandbox-agent.ts <task>');
+		console.error('Usage: sandbox-agent.ts <task> [model]');
 		process.exit(1);
 	}
 
-	run_task(task)
+	run_task(task, model)
 		.then((result) => {
 			console.log('\n--- Task Complete ---');
 			console.log(result.output);

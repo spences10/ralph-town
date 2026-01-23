@@ -109,7 +109,7 @@ export function create_agent_generation(
 	return parent.generation({
 		name: 'agent-execution',
 		input: task,
-		model: 'claude-sonnet-4-20250514', // TODO: make configurable
+		model: 'claude-sonnet-4-5', // TODO: make configurable
 	});
 }
 

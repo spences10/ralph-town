@@ -19,6 +19,7 @@ import {
 	record_backpressure,
 } from './telemetry.js';
 import type {
+	CriterionResult,
 	GitConfig,
 	LegacyAcceptanceCriterion,
 	OrchestrationResult,
@@ -367,12 +368,14 @@ function parse_agent_usage(output: string): AgentExecutionResult {
  * Each call creates a fresh Claude session (true Ralph pattern)
  *
  * @param previous_failure - Optional context about what failed in previous iteration
+ * @param model - Model to use ('haiku' or 'sonnet', default: 'sonnet')
  */
 async function run_agent_in_sandbox(
 	sandbox: Awaited<ReturnType<Daytona['create']>>,
 	task: string,
 	working_dir?: string,
 	previous_failure?: string,
+	model: string = 'sonnet',
 ): Promise<AgentExecutionResult> {
 	// Build the full prompt with context
 	let full_task = task;
@@ -380,7 +383,10 @@ async function run_agent_in_sandbox(
 		full_task = `${task}\n\nNOTE: Previous attempt failed. ${previous_failure}`;
 	}
 
-	print_message('system', `Running agent with task: ${task}`);
+	print_message(
+		'system',
+		`Running agent (${model}) with task: ${task}`,
+	);
 
 	const escaped_task = full_task
 		.replace(/"/g, '\\"')
@@ -388,7 +394,7 @@ async function run_agent_in_sandbox(
 	// tsx and claude-agent-sdk are globally installed via RALPH_IMAGE
 	// NODE_PATH needed so globally installed modules are resolvable
 	const work_dir = working_dir || '/home/daytona';
-	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx /home/daytona/sandbox-agent.ts "${escaped_task}"`;
+	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx /home/daytona/sandbox-agent.ts "${escaped_task}" "${model}"`;
 
 	// Agent tasks can take several minutes - Claude API calls + file operations
 	// 600 seconds (10 min) allows for complex multi-step tasks
@@ -403,14 +409,319 @@ async function run_agent_in_sandbox(
 }
 
 /**
+ * Run a single criterion in its own isolated sandbox
+ * Used for parallel execution mode
+ */
+async function run_criterion_isolated(
+	criterion: RalphCriterion,
+	config: RalphConfig,
+	criterion_index: number,
+	total_criteria: number,
+): Promise<CriterionResult> {
+	const start_time = Date.now();
+	let iterations = 0;
+	let tokens_used = 0;
+	const max_iter = config.max_iterations_per_criterion || 3;
+
+	const daytona = new Daytona();
+	let sandbox: Awaited<ReturnType<Daytona['create']>> | null = null;
+
+	// Generate unique branch name for this criterion
+	const base_branch = config.git?.feature_branch || 'feature/ralph';
+	const criterion_branch = `${base_branch}/${criterion.id}`;
+
+	print_message(
+		'system',
+		`[${criterion.id}] Starting isolated sandbox (${criterion_index + 1}/${total_criteria})`,
+	);
+
+	try {
+		// Create sandbox
+		sandbox = await daytona.create(
+			{ image: RALPH_IMAGE, language: 'typescript' },
+			{ timeout: 120 },
+		);
+		print_message(
+			'system',
+			`[${criterion.id}] Sandbox: ${sandbox.id}`,
+		);
+
+		// Set up sandbox environment
+		await setup_sandbox(sandbox);
+
+		// Set up git with criterion-specific branch
+		let working_dir = '/home/daytona';
+		if (config.repository && config.git) {
+			const criterion_git: GitConfig = {
+				...config.git,
+				feature_branch: criterion_branch,
+				pr_title: `${criterion.id}: ${criterion.description}`,
+				pr_body: `## ${criterion.description}\n\nSteps:\n${criterion.steps.map((s) => `- ${s}`).join('\n')}\n\n---\n*Automated by Ralph Loop (parallel mode)*`,
+			};
+			await setup_git(sandbox, config.repository, criterion_git);
+			working_dir = config.repository.working_dir
+				? `${REPO_PATH}/${config.repository.working_dir}`
+				: REPO_PATH;
+		}
+
+		// Track previous failure for context
+		let previous_failure: string | undefined;
+
+		// Iteration loop for this criterion
+		while (iterations < max_iter) {
+			iterations++;
+			print_message(
+				'system',
+				`[${criterion.id}] Iteration ${iterations}/${max_iter}`,
+			);
+
+			// Convert steps to task
+			const task = steps_to_task(criterion);
+
+			// Run agent with configured model
+			const model = config.execution?.model || 'sonnet';
+			const agent_result = await run_agent_in_sandbox(
+				sandbox,
+				task,
+				working_dir,
+				previous_failure,
+				model,
+			);
+
+			tokens_used +=
+				agent_result.usage.input_tokens +
+				agent_result.usage.output_tokens;
+
+			// Check backpressure
+			print_message(
+				'system',
+				`[${criterion.id}] Checking backpressure...`,
+			);
+			const bp_result = await sandbox.process.executeCommand(
+				criterion.backpressure,
+				undefined,
+				undefined,
+				120,
+			);
+			const passed = bp_result.exitCode === 0;
+
+			if (passed) {
+				print_message(
+					'system',
+					`[${criterion.id}] ${GREEN}PASS${RESET}`,
+				);
+
+				// Create PR for this criterion
+				let pr_url: string | null = null;
+				if (config.repository && config.git) {
+					const criterion_git: GitConfig = {
+						...config.git,
+						feature_branch: criterion_branch,
+						pr_title: `${criterion.id}: ${criterion.description}`,
+						pr_body: `## ${criterion.description}\n\nSteps:\n${criterion.steps.map((s) => `- ${s}`).join('\n')}\n\n---\n*Automated by Ralph Loop (parallel mode)*`,
+					};
+					await finalize_git(
+						sandbox,
+						criterion_git,
+						criterion.description,
+					);
+					pr_url = await create_pull_request(
+						config.repository,
+						criterion_git,
+						criterion.description,
+					);
+				}
+
+				return {
+					id: criterion.id,
+					status: 'success',
+					iterations,
+					tokens_used,
+					duration_ms: Date.now() - start_time,
+					pr_url,
+				};
+			} else {
+				const error_output = bp_result.result.slice(0, 1000);
+				previous_failure = `Backpressure failed: ${criterion.backpressure}\nOutput: ${error_output}`;
+				print_message(
+					'system',
+					`[${criterion.id}] FAIL - retrying...`,
+				);
+			}
+		}
+
+		// Max iterations reached
+		print_message(
+			'system',
+			`[${criterion.id}] Max iterations reached`,
+		);
+		return {
+			id: criterion.id,
+			status: 'max_iterations',
+			iterations,
+			tokens_used,
+			duration_ms: Date.now() - start_time,
+		};
+	} catch (error) {
+		const error_msg =
+			error instanceof Error ? error.message : String(error);
+		print_error(`[${criterion.id}] Error: ${error_msg}`);
+		return {
+			id: criterion.id,
+			status: 'error',
+			iterations,
+			tokens_used,
+			duration_ms: Date.now() - start_time,
+			error: error_msg,
+		};
+	} finally {
+		if (sandbox) {
+			print_message(
+				'system',
+				`[${criterion.id}] Cleaning up sandbox...`,
+			);
+			await daytona.delete(sandbox);
+		}
+	}
+}
+
+/**
+ * Run criteria in parallel using separate sandboxes
+ */
+async function orchestrate_parallel(
+	config: RalphConfig,
+): Promise<OrchestrationResult> {
+	init_telemetry();
+	const start_time = Date.now();
+
+	const criteria = config.acceptance_criteria || [];
+	const max_concurrent = config.execution?.max_concurrent || 3;
+
+	print_message(
+		'system',
+		`Starting parallel orchestration: ${criteria.length} criteria, max ${max_concurrent} concurrent`,
+	);
+
+	// Create telemetry trace
+	const telem_trace = create_ralph_trace({
+		task: 'parallel-orchestration',
+		features: criteria.map((c) => ({
+			id: c.id,
+			description: c.description,
+			task: steps_to_task(c),
+			backpressure: c.backpressure,
+			passes: c.passes,
+		})),
+		max_iterations:
+			(config.max_iterations_per_criterion || 3) * criteria.length,
+		budget_tokens: config.budget.max_tokens,
+	});
+
+	// Run criteria in parallel with concurrency limit
+	const results: CriterionResult[] = [];
+	const pending = [...criteria];
+	const running: Promise<CriterionResult>[] = [];
+
+	while (pending.length > 0 || running.length > 0) {
+		// Start new tasks up to max_concurrent
+		while (running.length < max_concurrent && pending.length > 0) {
+			const criterion = pending.shift()!;
+			const index = criteria.indexOf(criterion);
+			const promise = run_criterion_isolated(
+				criterion,
+				config,
+				index,
+				criteria.length,
+			);
+			running.push(promise);
+		}
+
+		// Wait for at least one to complete
+		if (running.length > 0) {
+			const completed = await Promise.race(running);
+			results.push(completed);
+
+			// Remove completed from running
+			const completed_index = running.findIndex(
+				async (p) => (await p).id === completed.id,
+			);
+			if (completed_index !== -1) {
+				running.splice(completed_index, 1);
+			}
+		}
+	}
+
+	// Aggregate results
+	const total_iterations = results.reduce(
+		(sum, r) => sum + r.iterations,
+		0,
+	);
+	const total_tokens = results.reduce(
+		(sum, r) => sum + r.tokens_used,
+		0,
+	);
+	const all_success = results.every((r) => r.status === 'success');
+	const criteria_met = results.map((r) => r.status === 'success');
+
+	// Finalize telemetry
+	finalize_trace(telem_trace, {
+		status: all_success ? 'success' : 'max_iterations',
+		iterations: total_iterations,
+		tokens_used: total_tokens,
+		duration_ms: Date.now() - start_time,
+		features_completed: results.filter((r) => r.status === 'success')
+			.length,
+	});
+
+	await flush_telemetry();
+
+	print_message(
+		'system',
+		`\n${GREEN}Parallel orchestration complete${RESET}`,
+	);
+	print_message(
+		'system',
+		`Results: ${results.filter((r) => r.status === 'success').length}/${criteria.length} succeeded`,
+	);
+
+	// List PRs created
+	const prs = results.filter((r) => r.pr_url).map((r) => r.pr_url);
+	if (prs.length > 0) {
+		print_message('system', `PRs created:`);
+		prs.forEach((url) => print_message('system', `  ${url}`));
+	}
+
+	return {
+		status: all_success ? 'success' : 'max_iterations',
+		iterations: total_iterations,
+		criteria_met,
+		metrics: {
+			tokens_used: total_tokens,
+			duration_ms: Date.now() - start_time,
+		},
+		criterion_results: results,
+	};
+}
+
+/**
  * Main orchestration loop
- * Supports two modes:
- * 1. Ralph pattern (primary): iterate through acceptance_criteria with steps
- * 2. Single task mode (legacy): run one task until legacy criteria met
+ * Supports three modes:
+ * 1. Parallel mode: run each criterion in separate sandbox
+ * 2. Sequential mode (default): iterate through acceptance_criteria with steps
+ * 3. Single task mode (legacy): run one task until legacy criteria met
  */
 export async function orchestrate(
 	config: RalphConfig,
 ): Promise<OrchestrationResult> {
+	// Check for parallel mode first
+	if (
+		config.execution?.mode === 'parallel' &&
+		config.acceptance_criteria &&
+		config.acceptance_criteria.length > 0
+	) {
+		return orchestrate_parallel(config);
+	}
+
 	// Initialize telemetry
 	init_telemetry();
 
@@ -419,7 +730,7 @@ export async function orchestrate(
 	let tokens_used = 0;
 	let criteria_completed = 0;
 
-	// Determine mode - ralph pattern takes priority
+	// Determine mode - ralph pattern takes priority (sequential)
 	const is_ralph_mode =
 		config.acceptance_criteria &&
 		config.acceptance_criteria.length > 0;
@@ -574,6 +885,7 @@ export async function orchestrate(
 
 				// Convert steps to task string for agent
 				const task = steps_to_task(criterion);
+				const model = config.execution?.model || 'sonnet';
 
 				// Run agent for this criterion (fresh Claude session each time)
 				const agent_gen = create_agent_generation(iter_span, task);
@@ -582,6 +894,7 @@ export async function orchestrate(
 					task,
 					working_dir,
 					previous_failure,
+					model,
 				);
 				if (agent_gen) {
 					agent_gen.end({
@@ -646,10 +959,13 @@ export async function orchestrate(
 				);
 
 				// Run the agent
+				const model = config.execution?.model || 'sonnet';
 				const agent_result = await run_agent_in_sandbox(
 					sandbox,
 					config.task,
 					working_dir,
+					undefined,
+					model,
 				);
 				print_message(
 					'dev',
