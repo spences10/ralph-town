@@ -368,14 +368,14 @@ function parse_agent_usage(output: string): AgentExecutionResult {
  * Each call creates a fresh Claude session (true Ralph pattern)
  *
  * @param previous_failure - Optional context about what failed in previous iteration
- * @param model - Model to use ('haiku' or 'sonnet', default: 'sonnet')
+ * @param model - Model to use ('haiku', 'sonnet', or 'opus', default: 'haiku')
  */
 async function run_agent_in_sandbox(
 	sandbox: Awaited<ReturnType<Daytona['create']>>,
 	task: string,
 	working_dir?: string,
 	previous_failure?: string,
-	model: string = 'sonnet',
+	model: string = 'haiku',
 ): Promise<AgentExecutionResult> {
 	// Build the full prompt with context
 	let full_task = task;
@@ -479,7 +479,7 @@ async function run_criterion_isolated(
 			const task = steps_to_task(criterion);
 
 			// Run agent with configured model
-			const model = config.execution?.model || 'sonnet';
+			const model = config.execution?.model || 'haiku';
 			const agent_result = await run_agent_in_sandbox(
 				sandbox,
 				task,
@@ -885,7 +885,7 @@ export async function orchestrate(
 
 				// Convert steps to task string for agent
 				const task = steps_to_task(criterion);
-				const model = config.execution?.model || 'sonnet';
+				const model = config.execution?.model || 'haiku';
 
 				// Run agent for this criterion (fresh Claude session each time)
 				const agent_gen = create_agent_generation(iter_span, task);
@@ -959,7 +959,7 @@ export async function orchestrate(
 				);
 
 				// Run the agent
-				const model = config.execution?.model || 'sonnet';
+				const model = config.execution?.model || 'haiku';
 				const agent_result = await run_agent_in_sandbox(
 					sandbox,
 					config.task,

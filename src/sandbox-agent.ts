@@ -56,7 +56,7 @@ const MODEL_MAP: Record<string, string> = {
  */
 export async function run_task(
 	prompt: string,
-	model: string = 'sonnet',
+	model: string = 'haiku',
 ): Promise<AgentResult> {
 	const results: string[] = [];
 	let usage = {
@@ -65,7 +65,7 @@ export async function run_task(
 		total_cost_usd: 0,
 	};
 
-	const model_id = MODEL_MAP[model] || MODEL_MAP.sonnet;
+	const model_id = MODEL_MAP[model] || MODEL_MAP.haiku;
 
 	try {
 		for await (const message of query({
@@ -124,7 +124,7 @@ export async function run_task(
 // If run directly, execute the task from command line args or stdin
 if (import.meta.url === `file://${process.argv[1]}`) {
 	const task = process.argv[2];
-	const model = process.argv[3] || 'sonnet';
+	const model = process.argv[3] || 'haiku';
 
 	if (!task) {
 		console.error('Usage: sandbox-agent.ts <task> [model]');

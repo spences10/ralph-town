@@ -48,7 +48,7 @@ export interface GitConfig {
 export interface ExecutionConfig {
 	mode: 'sequential' | 'parallel';
 	max_concurrent?: number; // default: 3 for parallel mode
-	model?: 'haiku' | 'sonnet' | 'opus'; // default: 'sonnet'
+	model?: 'haiku' | 'sonnet' | 'opus'; // default: 'haiku'
 }
 
 // Ralph configuration
