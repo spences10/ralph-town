@@ -7,13 +7,11 @@
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
-const WORKSPACE = '/home/daytona/workspace';
-
-const system_prompt = `You are a Developer Agent running in a Daytona sandbox.
+const system_prompt = `You are a Developer Agent running in a sandbox.
 
 ## Working Directory
-Your workspace is: ${WORKSPACE}
-Always work within this directory.
+Work in the current working directory (where this agent was launched).
+All file operations should be relative to this directory.
 
 ## Your Task
 You will receive a specific task to complete. Focus on that task only.

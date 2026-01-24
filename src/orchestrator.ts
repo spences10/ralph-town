@@ -94,17 +94,17 @@ async function check_all_legacy_criteria(
 	return results;
 }
 
+// Fixed path for sandbox agent (outside workspace to avoid clone conflicts)
+const SANDBOX_AGENT_PATH = '/home/daytona/sandbox-agent.ts';
+
 /**
  * Set up the runtime environment
  */
 async function setup_runtime(
 	runtime: RuntimeEnvironment,
 ): Promise<void> {
-	// Upload the sandbox agent code
-	await runtime.write_file(
-		`${runtime.get_workspace()}/sandbox-agent.ts`,
-		SANDBOX_AGENT_CODE,
-	);
+	// Upload the sandbox agent code to home dir (not workspace)
+	await runtime.write_file(SANDBOX_AGENT_PATH, SANDBOX_AGENT_CODE);
 
 	// Verify node available
 	const node_check = await runtime.execute('node --version');
@@ -179,9 +179,8 @@ async function run_agent(
 		.replace(/"/g, '\\"')
 		.replace(/\n/g, '\\n');
 	const work_dir = working_dir || runtime.get_workspace();
-	const agent_path = `${runtime.get_workspace()}/sandbox-agent.ts`;
 
-	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx ${agent_path} "${escaped_task}" "${model}"`;
+	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx ${SANDBOX_AGENT_PATH} "${escaped_task}" "${model}"`;
 
 	const result = await runtime.execute(command, { timeout: 600000 });
 

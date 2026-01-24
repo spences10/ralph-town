@@ -28,8 +28,7 @@ export async function setup_git(
 	}
 
 	const branch = repo.branch || 'main';
-	const workspace = runtime.get_workspace();
-	const repo_path = `${workspace}/repo`;
+	const repo_path = runtime.get_workspace();
 
 	print_message('system', `Cloning ${repo.url} (${branch})...`);
 
