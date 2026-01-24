@@ -42,6 +42,7 @@ See `bun ralph` to run.
 | Telemetry            | [telemetry.md](research/telemetry.md)                       | In progress  |
 | Git Workflow         | [git-workflow.md](research/git-workflow.md)                 | In progress  |
 | Skills Planning      | [skills-planning.md](research/skills-planning.md)           | In progress  |
+| Runtime Abstraction  | [runtime-abstraction.md](research/runtime-abstraction.md)   | Design draft |
 
 ---
 
@@ -58,6 +59,9 @@ See `bun ralph` to run.
 3. **How to handle long-running tasks vs sandbox timeouts?**
    120s timeout per command execution. Configurable.
 
+4. **Does Claude Agent SDK require special API access?**
+   No. Standard `ANTHROPIC_API_KEY` works. Also supports Bedrock/Vertex/Foundry.
+
 ---
 
 ## Open Questions
@@ -68,6 +72,8 @@ See `bun ralph` to run.
 4. What existing multi-agent patterns can we learn from?
 5. MCP server vs other interface options?
 6. Credential management for team usage?
+7. Runtime abstraction: clone fresh or assume pre-cloned for local?
+8. Worktree cleanup strategy after parallel runs?
 
 ---
 
