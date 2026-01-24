@@ -1,4 +1,4 @@
-# ralph-gas
+# ralph-town
 
 Two-agent TypeScript system using Claude Agent SDK with Daytona
 sandboxes.
