@@ -1,0 +1,30 @@
+{
+	"name": "ralph-sandbox",
+	"image": "node:22-slim",
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"configureZshAsDefaultShell": true
+		},
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/oven-sh/setup-bun:1": {}
+	},
+	"postCreateCommand": "bun install && npm i -g tsx @anthropic-ai/claude-agent-sdk",
+	"remoteEnv": {
+		"ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+		"GITHUB_PAT": "${localEnv:GITHUB_PAT}",
+		"LANGFUSE_SECRET_KEY": "${localEnv:LANGFUSE_SECRET_KEY}",
+		"LANGFUSE_PUBLIC_KEY": "${localEnv:LANGFUSE_PUBLIC_KEY}"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"oven.bun-vscode",
+				"dbaeumer.vscode-eslint",
+				"esbenp.prettier-vscode"
+			]
+		}
+	},
+	"forwardPorts": [],
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+	"workspaceFolder": "/workspace"
+}

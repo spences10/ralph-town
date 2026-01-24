@@ -44,9 +44,13 @@ export interface GitConfig {
 	pr_body?: string;
 }
 
+// Runtime type
+export type RuntimeType = 'daytona' | 'local' | 'devcontainer';
+
 // Execution configuration
 export interface ExecutionConfig {
 	mode: 'sequential' | 'parallel';
+	runtime?: RuntimeType; // default: 'daytona'
 	max_concurrent?: number; // default: 3 for parallel mode
 	model?: 'haiku' | 'sonnet' | 'opus'; // default: 'haiku'
 }
