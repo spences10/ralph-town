@@ -1,39 +1,54 @@
 # ralph-town
 
-Two-agent TypeScript system using Claude Agent SDK with Daytona
-sandboxes.
+CLI for autonomous agent orchestration using Claude Agent SDK.
 
 **Ralph Loop**: Iterate until acceptance criteria are met. **Gas
 Town**: Resource budgeting (tokens, cost, time).
 
-## How it Works
+## Install
 
+```bash
+npm install -g ralph-town
+# or
+npx ralph-town
 ```
-ralph.json → Orchestrator → Daytona Sandbox(es) → Agent → Backpressure Check → Loop/Done → PR(s)
-```
-
-1. Orchestrator reads `ralph.json` with acceptance criteria
-2. Spins up Daytona sandbox(es) with Node.js + Claude Agent SDK
-3. Clones target repo, creates feature branch(es)
-4. For each criterion:
-   - Runs sandbox agent with the task steps
-   - Checks backpressure (build, tests, file existence)
-   - Retries on failure, moves on when passing
-5. Commits, pushes, creates PR(s)
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-bun install
+# Initialize config in your project
+ralph-town init
 
-# Set up environment
-cp .env.example .env
-# Add: ANTHROPIC_API_KEY, DAYTONA_API_KEY, GITHUB_PAT
-# Optional: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY
+# Edit ralph.json with your task and repo
 
-# Run the Ralph Loop
-bun ralph
+# Run the loop
+ralph-town run
+```
+
+## How it Works
+
+```
+ralph.json → Orchestrator → Sandbox → Agent → Backpressure Check → Loop/Done → PR
+```
+
+1. Reads `ralph.json` with acceptance criteria
+2. Spins up sandbox (Daytona, local, or devcontainer)
+3. Clones target repo, creates feature branch
+4. For each criterion:
+   - Runs agent with the task steps
+   - Checks backpressure (build, tests, etc.)
+   - Retries on failure, moves on when passing
+5. Commits, pushes, creates PR
+
+## Commands
+
+```bash
+ralph-town init      # Create ralph.json template
+ralph-town validate  # Validate config
+ralph-town run       # Execute the loop
+ralph-town run --runtime local      # Use local runtime
+ralph-town run --runtime daytona    # Use Daytona sandbox
+ralph-town run --dry-run            # Validate without executing
 ```
 
 ## Configuration
@@ -48,12 +63,10 @@ bun ralph
 	},
 	"git": {
 		"feature_branch": "feature/my-changes",
-		"create_pr": true,
-		"pr_title": "feat: automated improvements"
+		"create_pr": true
 	},
 	"execution": {
-		"mode": "parallel",
-		"max_concurrent": 3,
+		"mode": "sequential",
 		"model": "haiku"
 	},
 	"acceptance_criteria": [
@@ -62,114 +75,58 @@ bun ralph
 			"description": "Add health endpoint",
 			"steps": [
 				"Create src/routes/api/health/+server.ts",
-				"Export GET handler returning json({ status: 'ok' })",
-				"Import json from @sveltejs/kit"
+				"Export GET handler returning json({ status: 'ok' })"
 			],
 			"backpressure": "pnpm run build",
 			"passes": false
 		}
 	],
-	"max_iterations_per_criterion": 3,
-	"budget": {
-		"max_tokens": 50000
-	}
+	"max_iterations_per_criterion": 3
 }
 ```
 
 ### Execution Modes
 
-| Mode         | Description                                     | PRs Created        |
-| ------------ | ----------------------------------------------- | ------------------ |
-| `sequential` | One sandbox, criteria run in order              | 1 combined PR      |
-| `parallel`   | Multiple sandboxes, criteria run simultaneously | 1 PR per criterion |
+| Mode         | Description                 | PRs Created        |
+| ------------ | --------------------------- | ------------------ |
+| `sequential` | Criteria run in order       | 1 combined PR      |
+| `parallel`   | Criteria run simultaneously | 1 PR per criterion |
+
+### Runtimes
+
+| Runtime        | Description            | Requirements         |
+| -------------- | ---------------------- | -------------------- |
+| `local`        | Direct shell execution | None                 |
+| `daytona`      | Cloud sandbox          | `DAYTONA_API_KEY`    |
+| `devcontainer` | Docker container       | Running devcontainer |
 
 ### Model Selection
 
-| Model    | Best For                              | Cost     |
-| -------- | ------------------------------------- | -------- |
-| `haiku`  | Well-scoped tasks with clear steps    | Default  |
-| `sonnet` | Complex tasks, ambiguous requirements | ~5x more |
-| `opus`   | Most challenging tasks                | Premium  |
+| Model    | Best For          | Cost     |
+| -------- | ----------------- | -------- |
+| `haiku`  | Well-scoped tasks | Default  |
+| `sonnet` | Complex tasks     | ~5x more |
+| `opus`   | Most challenging  | Premium  |
 
 ### Environment Variables
 
-| Variable              | Required | Description                                 |
-| --------------------- | -------- | ------------------------------------------- |
-| `ANTHROPIC_API_KEY`   | Yes      | Claude API key                              |
-| `DAYTONA_API_KEY`     | Yes      | Daytona sandbox API key                     |
-| `GITHUB_PAT`          | Yes      | GitHub token for clone/push/PR              |
-| `LANGFUSE_PUBLIC_KEY` | No       | Langfuse telemetry                          |
-| `LANGFUSE_SECRET_KEY` | No       | Langfuse telemetry                          |
-| `LANGFUSE_BASE_URL`   | No       | Langfuse host (default: cloud.langfuse.com) |
-
-## Scripts
-
-```bash
-bun ralph              # Run the Ralph Loop
-bun dev                # Development mode
-bun run build          # Compile TypeScript
-bun start              # Build + run
-bun scripts/fetch-traces.ts  # View Langfuse traces
-```
-
-## Architecture
-
-```
-src/
-├── orchestrator.ts    # Main loop, sandbox management, git workflow
-├── sandbox-agent.ts   # Claude agent running inside Daytona
-├── telemetry.ts       # Langfuse integration for observability
-├── types.ts           # TypeScript types for ralph.json schema
-└── utils.ts           # Shared utilities
-
-skills/
-└── ralph-discovery/   # Codebase discovery skill
-    ├── SKILL.md
-    ├── references/
-    └── scripts/
-```
-
-## Discovery (Optional)
-
-Before creating ralph.json, run discovery to understand the target
-codebase:
-
-```bash
-# Use the discovery skill to explore a repo
-# Outputs: project type, paths, package manager, build commands
-```
-
-This helps generate accurate backpressure commands and avoid path
-mismatches.
-
-See `skills/ralph-discovery/` for details.
-
-## Telemetry
-
-When Langfuse keys are configured, traces include:
-
-- Per-run trace with metadata (criteria, budget, iterations)
-- Per-iteration spans with criterion ID
-- Agent execution generations with token usage
-- Backpressure check results (pass/fail, output)
-
-Fetch traces programmatically:
-
-```bash
-bun scripts/fetch-traces.ts
-```
+| Variable              | Required        | Description     |
+| --------------------- | --------------- | --------------- |
+| `ANTHROPIC_API_KEY`   | Yes             | Claude API key  |
+| `DAYTONA_API_KEY`     | runtime=daytona | Daytona API key |
+| `GITHUB_PAT`          | git workflow    | GitHub token    |
+| `LANGFUSE_PUBLIC_KEY` | No              | Telemetry       |
+| `LANGFUSE_SECRET_KEY` | No              | Telemetry       |
 
 ## Acceptance Criteria Format
 
-Each criterion has:
-
-| Field          | Description                                  |
-| -------------- | -------------------------------------------- |
-| `id`           | Unique identifier (e.g., `ac-001`)           |
-| `description`  | What this criterion achieves                 |
-| `steps`        | Array of implementation steps for the agent  |
-| `backpressure` | Command to verify completion (exit 0 = pass) |
-| `passes`       | Boolean, set to true when criterion passes   |
+| Field          | Description                        |
+| -------------- | ---------------------------------- |
+| `id`           | Unique identifier (e.g., `ac-001`) |
+| `description`  | What this criterion achieves       |
+| `steps`        | Implementation steps for agent     |
+| `backpressure` | Command to verify (exit 0 = pass)  |
+| `passes`       | Set to true when passing           |
 
 ### Backpressure Patterns
 
@@ -178,18 +135,12 @@ Each criterion has:
 pnpm run build
 
 # File exists
-test -f src/lib/components/MyComponent.svelte
-
-# File contains string
-grep -q 'pattern' path/to/file
+test -f src/lib/MyComponent.svelte
 
 # Combined checks
-test -f src/lib/theme.svelte.ts && \
-  grep -q 'ThemeToggle' src/routes/+layout.svelte && \
-  pnpm run build
+test -f src/lib/theme.ts && pnpm run build
 ```
 
 ## Research
 
-See `docs/RESEARCH.md` for architecture exploration and design
-decisions.
+See `docs/RESEARCH.md` for architecture and design decisions.
