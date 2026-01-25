@@ -5,6 +5,16 @@
 	"description": "Core orchestrator and runtimes for Ralph Loop",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"author": "Scott Spence",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/spences10/ralph-town.git",
+		"directory": "packages/core"
+	},
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",

@@ -11,7 +11,7 @@ import validate_cmd from './commands/validate.js';
 
 const main = defineCommand({
 	meta: {
-		name: 'ralph',
+		name: 'ralph-town',
 		version: '0.0.1',
 		description: 'Autonomous agent orchestration with Ralph Loop',
 	},

@@ -30,20 +30,24 @@ export default defineCommand({
 
 			const errors: string[] = [];
 
-			// Required fields
-			if (!config.task) {
-				errors.push('Missing required field: task');
+			// Must have either task (legacy) or acceptance_criteria (ralph mode)
+			if (!config.task && !config.acceptance_criteria?.length) {
+				errors.push('Missing required: task or acceptance_criteria');
 			}
 
 			// Validate acceptance criteria
 			if (config.acceptance_criteria) {
-				for (const [i, criterion] of config.acceptance_criteria.entries()) {
+				for (const [
+					i,
+					criterion,
+				] of config.acceptance_criteria.entries()) {
 					if (!criterion.id) {
 						errors.push(`acceptance_criteria[${i}]: missing id`);
 					}
-					if (!criterion.check_command) {
+					// Support both legacy check_command and new backpressure
+					if (!criterion.check_command && !criterion.backpressure) {
 						errors.push(
-							`acceptance_criteria[${i}]: missing check_command`,
+							`acceptance_criteria[${i}]: missing backpressure (or check_command)`,
 						);
 					}
 				}
@@ -67,11 +71,15 @@ export default defineCommand({
 			}
 
 			console.log('Config is valid');
-			console.log(`  Task: ${config.task.slice(0, 50)}...`);
+			if (config.task) {
+				console.log(`  Task: ${config.task.slice(0, 50)}...`);
+			}
 			console.log(
 				`  Criteria: ${config.acceptance_criteria?.length || 0}`,
 			);
-			console.log(`  Max iterations: ${config.max_iterations || 10}`);
+			console.log(
+				`  Mode: ${config.execution?.mode || 'sequential'}`,
+			);
 		} catch (err) {
 			console.error(`Error reading ${config_path}:`);
 			console.error(err instanceof Error ? err.message : err);
