@@ -1,6 +1,6 @@
 # Daytona Cost Projections
 
-Cost estimates for Ralph-GAS with a team of 10 developers.
+Cost estimates for Ralph-Town with a team of 10 developers.
 
 ---
 
@@ -19,7 +19,7 @@ Source: https://www.daytona.io/pricing
 
 ---
 
-## Ralph-GAS Sandbox Profile
+## Ralph-Town Sandbox Profile
 
 Current sandbox configuration:
 

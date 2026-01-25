@@ -1,14 +1,22 @@
 /**
- * Ralph Orchestrator - Minimal CLI for design validation
+ * Ralph Orchestrator
  *
  * Runs the Ralph Loop: iterate until acceptance criteria met
+ * Supports multiple runtimes: daytona (default), devcontainer, local
  */
 
-import { Daytona, Image } from '@daytonaio/sdk';
-import { exec } from 'child_process';
 import 'dotenv/config';
 import { readFileSync } from 'fs';
-import { promisify } from 'util';
+import {
+	create_pull_request,
+	finalize_git,
+	setup_git,
+} from './git-workflow.js';
+import {
+	create_runtime,
+	validate_runtime_env,
+	type RuntimeEnvironment,
+} from './runtime/index.js';
 import {
 	create_agent_generation,
 	create_iteration_span,
@@ -25,11 +33,8 @@ import type {
 	OrchestrationResult,
 	RalphConfig,
 	RalphCriterion,
-	RepositoryConfig,
 } from './types.js';
 import { GREEN, print_error, print_message, RESET } from './utils.js';
-
-const exec_async = promisify(exec);
 
 const SANDBOX_AGENT_CODE = readFileSync(
 	new URL('./sandbox-agent.ts', import.meta.url),
@@ -37,60 +42,7 @@ const SANDBOX_AGENT_CODE = readFileSync(
 );
 
 /**
- * Declarative image with pre-baked dependencies
- * - Node.js 22 slim base
- * - tsx for running TypeScript
- * - Claude Agent SDK
- * - gh CLI for PR creation (future)
- *
- * Cached for 24 hours per Daytona runner
- */
-const RALPH_IMAGE = Image.base('node:22-slim').dockerfileCommands([
-	'RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*',
-	'RUN npm install -g tsx @anthropic-ai/claude-agent-sdk',
-]);
-
-/**
- * Check a single legacy acceptance criterion in the sandbox
- */
-async function check_legacy_criterion(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	criterion: LegacyAcceptanceCriterion,
-): Promise<boolean> {
-	switch (criterion.type) {
-		case 'file_exists': {
-			const result = await sandbox.process.executeCommand(
-				`test -f "${criterion.path}" && echo "EXISTS" || echo "MISSING"`,
-			);
-			return result.result.trim() === 'EXISTS';
-		}
-		case 'command_succeeds': {
-			const result = await sandbox.process.executeCommand(
-				criterion.command,
-			);
-			return result.exitCode === 0;
-		}
-		default:
-			return false;
-	}
-}
-
-/**
- * Check all legacy acceptance criteria
- */
-async function check_all_legacy_criteria(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	criteria: LegacyAcceptanceCriterion[],
-): Promise<boolean[]> {
-	const results: boolean[] = [];
-	for (const criterion of criteria) {
-		results.push(await check_legacy_criterion(sandbox, criterion));
-	}
-	return results;
-}
-
-/**
- * Get the next incomplete criterion (ralph pattern)
+ * Get the next incomplete criterion
  */
 function get_next_criterion(
 	criteria: RalphCriterion[],
@@ -109,217 +61,136 @@ function steps_to_task(criterion: RalphCriterion): string {
 }
 
 /**
- * Set up the sandbox environment
- * Dependencies are pre-baked via Declarative Builder
+ * Check a legacy acceptance criterion
  */
-async function setup_sandbox(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
-): Promise<void> {
-	// Upload the sandbox agent code
-	await sandbox.fs.uploadFile(
-		Buffer.from(SANDBOX_AGENT_CODE),
-		'/home/daytona/sandbox-agent.ts',
-	);
-
-	// Verify Node.js is available (baked into image)
-	const node_check =
-		await sandbox.process.executeCommand('node --version');
-	if (node_check.exitCode !== 0) {
-		throw new Error('Node.js not available in sandbox');
-	}
-	print_message('system', `Node.js: ${node_check.result.trim()}`);
-
-	// Dependencies are pre-installed in RALPH_IMAGE
-	// No npm install needed - tsx and claude-agent-sdk are globally available
-	print_message('system', 'Dependencies pre-installed via image');
-}
-
-const REPO_PATH = '/home/daytona/workspace';
-
-/**
- * Set up git repository in sandbox
- * Clone repo and create feature branch
- */
-async function setup_git(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	repo: RepositoryConfig,
-	git: GitConfig,
-): Promise<void> {
-	const github_pat = process.env.GITHUB_PAT;
-	if (!github_pat) {
-		throw new Error(
-			'GITHUB_PAT environment variable required for git workflow',
-		);
-	}
-
-	const branch = repo.branch || 'main';
-
-	print_message('system', `Cloning ${repo.url} (${branch})...`);
-
-	// Clone repository using SDK git
-	await sandbox.git.clone(
-		repo.url,
-		REPO_PATH,
-		branch,
-		undefined, // commitId
-		'git',
-		github_pat,
-	);
-
-	print_message('system', `Creating branch: ${git.feature_branch}`);
-
-	// Create and checkout feature branch
-	await sandbox.git.createBranch(REPO_PATH, git.feature_branch);
-	await sandbox.git.checkoutBranch(REPO_PATH, git.feature_branch);
-
-	// Configure git user for commits
-	const author = git.commit_author || 'Ralph Agent';
-	const email = git.commit_email || 'ralph@example.com';
-	await sandbox.process.executeCommand(
-		`cd ${REPO_PATH} && git config user.name "${author}" && git config user.email "${email}"`,
-	);
-
-	// Pre-install deps if package.json exists (saves agent iteration)
-	// Detect package manager from lockfile
-	const lockfile_check = await sandbox.process.executeCommand(
-		`cd ${REPO_PATH} && if [ -f pnpm-lock.yaml ]; then echo "pnpm"; elif [ -f bun.lockb ] || [ -f bun.lock ]; then echo "bun"; elif [ -f yarn.lock ]; then echo "yarn"; elif [ -f package-lock.json ]; then echo "npm"; elif [ -f package.json ]; then echo "npm"; fi`,
-	);
-	const pkg_manager = lockfile_check.result.trim();
-
-	if (pkg_manager) {
-		// Install package manager on-demand if not npm
-		if (pkg_manager === 'pnpm') {
-			print_message('system', 'Installing pnpm...');
-			await sandbox.process.executeCommand(
-				'npm install -g pnpm',
-				undefined,
-				undefined,
-				60,
-			);
-		} else if (pkg_manager === 'yarn') {
-			print_message('system', 'Installing yarn...');
-			await sandbox.process.executeCommand(
-				'npm install -g yarn',
-				undefined,
-				undefined,
-				60,
-			);
+async function check_legacy_criterion(
+	runtime: RuntimeEnvironment,
+	criterion: LegacyAcceptanceCriterion,
+): Promise<boolean> {
+	switch (criterion.type) {
+		case 'file_exists': {
+			return runtime.file_exists(criterion.path);
 		}
-
-		print_message(
-			'system',
-			`Installing dependencies (${pkg_manager})...`,
-		);
-		const install_result = await sandbox.process.executeCommand(
-			`cd ${REPO_PATH} && ${pkg_manager} install`,
-			undefined,
-			undefined,
-			120,
-		);
-		if (install_result.exitCode === 0) {
-			print_message('system', 'Dependencies installed');
-		} else {
-			print_message(
-				'system',
-				`Warning: ${pkg_manager} install failed (agent may retry)`,
-			);
+		case 'command_succeeds': {
+			const result = await runtime.execute(criterion.command);
+			return result.exit_code === 0;
 		}
+		default:
+			return false;
 	}
-
-	print_message('system', `Git ready: ${git.feature_branch}`);
 }
 
 /**
- * Finalize git changes
- * Stage, commit, and push changes
+ * Check all legacy acceptance criteria
  */
-async function finalize_git(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
-	git: GitConfig,
-	task: string,
+async function check_all_legacy_criteria(
+	runtime: RuntimeEnvironment,
+	criteria: LegacyAcceptanceCriterion[],
+): Promise<boolean[]> {
+	const results: boolean[] = [];
+	for (const criterion of criteria) {
+		results.push(await check_legacy_criterion(runtime, criterion));
+	}
+	return results;
+}
+
+// Fixed path for sandbox agent (outside workspace to avoid clone conflicts)
+const SANDBOX_AGENT_PATH = '/home/daytona/sandbox-agent.ts';
+const PROGRESS_FILE = 'progress.txt';
+
+/**
+ * Initialize progress.txt in the working directory
+ */
+async function init_progress(
+	runtime: RuntimeEnvironment,
+	working_dir: string,
+	config: RalphConfig,
 ): Promise<void> {
-	const github_pat = process.env.GITHUB_PAT;
-	if (!github_pat) {
-		throw new Error('GITHUB_PAT required for git push');
-	}
+	const header = `# Ralph Progress Log
+# Started: ${new Date().toISOString()}
+# Repository: ${config.repository?.url || 'local'}
 
-	// Check if there are changes to commit
-	const status = await sandbox.git.status(REPO_PATH);
-	const has_changes =
-		status.fileStatus && status.fileStatus.length > 0;
+## Criteria
+${config.acceptance_criteria?.map((c) => `- [ ] ${c.id}: ${c.description}`).join('\n') || 'None'}
 
-	if (!has_changes) {
-		print_message('system', 'No changes to commit');
-		return;
-	}
-
-	print_message('system', 'Staging changes...');
-
-	// Stage all changed files
-	const files_to_add = status.fileStatus.map((f) => f.name);
-	if (files_to_add.length > 0) {
-		await sandbox.git.add(REPO_PATH, files_to_add);
-	}
-
-	// Generate commit message
-	const message = git.commit_message || `feat: ${task.slice(0, 50)}`;
-	const author = git.commit_author || 'Ralph Agent';
-	const email = git.commit_email || 'ralph@example.com';
-
-	print_message('system', `Committing: ${message}`);
-
-	await sandbox.git.commit(REPO_PATH, message, author, email);
-
-	print_message('system', `Pushing to ${git.feature_branch}...`);
-
-	await sandbox.git.push(REPO_PATH, 'git', github_pat);
-
-	print_message(
-		'system',
-		`${GREEN}Pushed to ${git.feature_branch}${RESET}`,
-	);
+---
+`;
+	await runtime.write_file(`${working_dir}/${PROGRESS_FILE}`, header);
 }
 
 /**
- * Create a pull request using local gh CLI
+ * Append iteration result to progress.txt
  */
-async function create_pull_request(
-	repo: RepositoryConfig,
-	git: GitConfig,
-	task: string,
-): Promise<string | null> {
-	if (!git.create_pr) {
-		return null;
-	}
+async function append_progress(
+	runtime: RuntimeEnvironment,
+	working_dir: string,
+	criterion_id: string,
+	iteration: number,
+	agent_output: string,
+	passed: boolean,
+): Promise<void> {
+	// Extract progress block from agent output
+	const progress_match = agent_output.match(
+		/```progress\n([\s\S]*?)```/,
+	);
+	const progress_content = progress_match
+		? progress_match[1].trim()
+		: 'No progress block found';
 
-	const title = git.pr_title || `feat: ${task.slice(0, 50)}`;
-	const body =
-		git.pr_body ||
-		`## Summary\n\nAutomated by Ralph Loop.\n\n**Task:** ${task}`;
+	const entry = `
+## Iteration ${iteration} - ${criterion_id} (${passed ? 'PASS' : 'FAIL'})
+Time: ${new Date().toISOString()}
 
-	// Extract owner/repo from URL
-	const match = repo.url.match(/github\.com[:/](.+?)(?:\.git)?$/);
-	if (!match) {
-		print_error('Could not parse repo URL for PR creation');
-		return null;
-	}
-	const repo_path = match[1];
+${progress_content}
 
-	print_message('system', `Creating PR: ${title}`);
+---
+`;
 
+	// Read existing content and append
+	const path = `${working_dir}/${PROGRESS_FILE}`;
+	let existing = '';
 	try {
-		const { stdout } = await exec_async(
-			`gh pr create --repo "${repo_path}" --head "${git.feature_branch}" --title "${title}" --body "${body.replace(/"/g, '\\"')}"`,
-		);
-		const pr_url = stdout.trim();
-		print_message('system', `${GREEN}PR created: ${pr_url}${RESET}`);
-		return pr_url;
-	} catch (error) {
-		const err_msg =
-			error instanceof Error ? error.message : String(error);
-		print_error(`Failed to create PR: ${err_msg}`);
-		return null;
+		const result = await runtime.execute(`cat "${path}"`);
+		existing = result.stdout;
+	} catch {
+		// File might not exist
 	}
+
+	await runtime.write_file(path, existing + entry);
+}
+
+/**
+ * Read current progress.txt content
+ */
+async function read_progress(
+	runtime: RuntimeEnvironment,
+	working_dir: string,
+): Promise<string> {
+	const path = `${working_dir}/${PROGRESS_FILE}`;
+	try {
+		const result = await runtime.execute(`cat "${path}"`);
+		return result.stdout;
+	} catch {
+		return '';
+	}
+}
+
+/**
+ * Set up the runtime environment
+ */
+async function setup_runtime(
+	runtime: RuntimeEnvironment,
+): Promise<void> {
+	// Upload the sandbox agent code to home dir (not workspace)
+	await runtime.write_file(SANDBOX_AGENT_PATH, SANDBOX_AGENT_CODE);
+
+	// Verify node available
+	const node_check = await runtime.execute('node --version');
+	if (node_check.exit_code !== 0) {
+		throw new Error('Node.js not available in runtime');
+	}
+	print_message('system', `Node.js: ${node_check.stdout.trim()}`);
+	print_message('system', 'Dependencies pre-installed via image');
 }
 
 /**
@@ -351,11 +222,10 @@ function parse_agent_usage(output: string): AgentExecutionResult {
 		try {
 			usage = JSON.parse(usage_match[1]);
 		} catch {
-			// Fallback to zeros if parse fails
+			// Fallback to zeros
 		}
 	}
 
-	// Remove usage marker from output
 	const clean_output = output
 		.replace(/__USAGE_JSON__.+?__USAGE_JSON__/, '')
 		.trim();
@@ -364,53 +234,78 @@ function parse_agent_usage(output: string): AgentExecutionResult {
 }
 
 /**
- * Run the agent task in the sandbox
- * Each call creates a fresh Claude session (true Ralph pattern)
- *
- * @param previous_failure - Optional context about what failed in previous iteration
- * @param model - Model to use ('haiku', 'sonnet', or 'opus', default: 'haiku')
+ * Build enhanced task prompt with context
  */
-async function run_agent_in_sandbox(
-	sandbox: Awaited<ReturnType<Daytona['create']>>,
+function build_task_prompt(
+	criterion: RalphCriterion,
+	progress_context: string,
+	previous_failure?: string,
+	feedback_commands?: string[],
+): string {
+	const steps_text = criterion.steps
+		.map((s, i) => `${i + 1}. ${s}`)
+		.join('\n');
+
+	const feedback_section = feedback_commands?.length
+		? `\n## Feedback Commands to Run
+${feedback_commands.map((c) => `- \`${c}\``).join('\n')}`
+		: '';
+
+	const failure_section = previous_failure
+		? `\n## Previous Attempt Failed
+${previous_failure}
+Fix this issue in this iteration.`
+		: '';
+
+	const progress_section = progress_context
+		? `\n## Progress So Far
+\`\`\`
+${progress_context.slice(-2000)}
+\`\`\``
+		: '';
+
+	return `# Task: ${criterion.description}
+
+## Steps
+${steps_text}
+
+## Backpressure Check
+This command must pass for the task to be considered complete:
+\`${criterion.backpressure}\`
+${feedback_section}${failure_section}${progress_section}
+
+Remember: Explore first, then execute, then verify with feedback loops.`;
+}
+
+/**
+ * Run the agent task in the runtime
+ */
+async function run_agent(
+	runtime: RuntimeEnvironment,
 	task: string,
 	working_dir?: string,
 	previous_failure?: string,
 	model: string = 'haiku',
 ): Promise<AgentExecutionResult> {
-	// Build the full prompt with context
-	let full_task = task;
-	if (previous_failure) {
-		full_task = `${task}\n\nNOTE: Previous attempt failed. ${previous_failure}`;
-	}
-
 	print_message(
 		'system',
-		`Running agent (${model}) with task: ${task}`,
+		`Running agent (${model}) with task: ${task.slice(0, 100)}...`,
 	);
 
-	const escaped_task = full_task
+	const escaped_task = task
 		.replace(/"/g, '\\"')
 		.replace(/\n/g, '\\n');
-	// tsx and claude-agent-sdk are globally installed via RALPH_IMAGE
-	// NODE_PATH needed so globally installed modules are resolvable
-	const work_dir = working_dir || '/home/daytona';
-	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx /home/daytona/sandbox-agent.ts "${escaped_task}" "${model}"`;
+	const work_dir = working_dir || runtime.get_workspace();
 
-	// Agent tasks can take several minutes - Claude API calls + file operations
-	// 600 seconds (10 min) allows for complex multi-step tasks
-	const result = await sandbox.process.executeCommand(
-		command,
-		undefined,
-		undefined,
-		600,
-	);
+	const command = `export ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}" && export NODE_PATH=/usr/local/lib/node_modules && cd ${work_dir} && tsx ${SANDBOX_AGENT_PATH} "${escaped_task}" "${model}"`;
 
-	return parse_agent_usage(result.result);
+	const result = await runtime.execute(command, { timeout: 600000 });
+
+	return parse_agent_usage(result.stdout);
 }
 
 /**
- * Run a single criterion in its own isolated sandbox
- * Used for parallel execution mode
+ * Run a single criterion in its own isolated runtime (parallel mode)
  */
 async function run_criterion_isolated(
 	criterion: RalphCriterion,
@@ -423,8 +318,8 @@ async function run_criterion_isolated(
 	let tokens_used = 0;
 	const max_iter = config.max_iterations_per_criterion || 3;
 
-	const daytona = new Daytona();
-	let sandbox: Awaited<ReturnType<Daytona['create']>> | null = null;
+	const runtime_type = config.execution?.runtime || 'daytona';
+	const runtime = create_runtime({ type: runtime_type });
 
 	// Generate unique branch name for this criterion
 	const base_branch = config.git?.feature_branch || 'feature/ralph';
@@ -432,25 +327,19 @@ async function run_criterion_isolated(
 
 	print_message(
 		'system',
-		`[${criterion.id}] Starting isolated sandbox (${criterion_index + 1}/${total_criteria})`,
+		`[${criterion.id}] Starting isolated runtime (${criterion_index + 1}/${total_criteria})`,
 	);
 
 	try {
-		// Create sandbox
-		sandbox = await daytona.create(
-			{ image: RALPH_IMAGE, language: 'typescript' },
-			{ timeout: 120 },
-		);
+		await runtime.initialize();
 		print_message(
 			'system',
-			`[${criterion.id}] Sandbox: ${sandbox.id}`,
+			`[${criterion.id}] Runtime: ${runtime.id}`,
 		);
 
-		// Set up sandbox environment
-		await setup_sandbox(sandbox);
+		await setup_runtime(runtime);
 
-		// Set up git with criterion-specific branch
-		let working_dir = '/home/daytona';
+		let working_dir = runtime.get_workspace();
 		if (config.repository && config.git) {
 			const criterion_git: GitConfig = {
 				...config.git,
@@ -458,16 +347,18 @@ async function run_criterion_isolated(
 				pr_title: `${criterion.id}: ${criterion.description}`,
 				pr_body: `## ${criterion.description}\n\nSteps:\n${criterion.steps.map((s) => `- ${s}`).join('\n')}\n\n---\n*Automated by Ralph Loop (parallel mode)*`,
 			};
-			await setup_git(sandbox, config.repository, criterion_git);
-			working_dir = config.repository.working_dir
-				? `${REPO_PATH}/${config.repository.working_dir}`
-				: REPO_PATH;
+			working_dir = await setup_git(
+				runtime,
+				config.repository,
+				criterion_git,
+			);
 		}
 
-		// Track previous failure for context
+		// Initialize progress tracking
+		await init_progress(runtime, working_dir, config);
+
 		let previous_failure: string | undefined;
 
-		// Iteration loop for this criterion
 		while (iterations < max_iter) {
 			iterations++;
 			print_message(
@@ -475,16 +366,23 @@ async function run_criterion_isolated(
 				`[${criterion.id}] Iteration ${iterations}/${max_iter}`,
 			);
 
-			// Convert steps to task
-			const task = steps_to_task(criterion);
-
-			// Run agent with configured model
+			// Read current progress and build enhanced task
+			const progress_context = await read_progress(
+				runtime,
+				working_dir,
+			);
+			const task = build_task_prompt(
+				criterion,
+				progress_context,
+				previous_failure,
+				['pnpm run build', 'pnpm run check'],
+			);
 			const model = config.execution?.model || 'haiku';
-			const agent_result = await run_agent_in_sandbox(
-				sandbox,
+			const agent_result = await run_agent(
+				runtime,
 				task,
 				working_dir,
-				previous_failure,
+				undefined, // previous_failure now in task prompt
 				model,
 			);
 
@@ -492,18 +390,28 @@ async function run_criterion_isolated(
 				agent_result.usage.input_tokens +
 				agent_result.usage.output_tokens;
 
-			// Check backpressure
 			print_message(
 				'system',
 				`[${criterion.id}] Checking backpressure...`,
 			);
-			const bp_result = await sandbox.process.executeCommand(
+			const bp_result = await runtime.execute(
 				criterion.backpressure,
-				undefined,
-				undefined,
-				120,
+				{
+					cwd: working_dir,
+					timeout: 120000,
+				},
 			);
-			const passed = bp_result.exitCode === 0;
+			const passed = bp_result.exit_code === 0;
+
+			// Append to progress.txt
+			await append_progress(
+				runtime,
+				working_dir,
+				criterion.id,
+				iterations,
+				agent_result.output,
+				passed,
+			);
 
 			if (passed) {
 				print_message(
@@ -511,7 +419,6 @@ async function run_criterion_isolated(
 					`[${criterion.id}] ${GREEN}PASS${RESET}`,
 				);
 
-				// Create PR for this criterion
 				let pr_url: string | null = null;
 				if (config.repository && config.git) {
 					const criterion_git: GitConfig = {
@@ -521,7 +428,7 @@ async function run_criterion_isolated(
 						pr_body: `## ${criterion.description}\n\nSteps:\n${criterion.steps.map((s) => `- ${s}`).join('\n')}\n\n---\n*Automated by Ralph Loop (parallel mode)*`,
 					};
 					await finalize_git(
-						sandbox,
+						runtime,
 						criterion_git,
 						criterion.description,
 					);
@@ -541,7 +448,7 @@ async function run_criterion_isolated(
 					pr_url,
 				};
 			} else {
-				const error_output = bp_result.result.slice(0, 1000);
+				const error_output = bp_result.stdout.slice(0, 1000);
 				previous_failure = `Backpressure failed: ${criterion.backpressure}\nOutput: ${error_output}`;
 				print_message(
 					'system',
@@ -550,7 +457,6 @@ async function run_criterion_isolated(
 			}
 		}
 
-		// Max iterations reached
 		print_message(
 			'system',
 			`[${criterion.id}] Max iterations reached`,
@@ -575,18 +481,16 @@ async function run_criterion_isolated(
 			error: error_msg,
 		};
 	} finally {
-		if (sandbox) {
-			print_message(
-				'system',
-				`[${criterion.id}] Cleaning up sandbox...`,
-			);
-			await daytona.delete(sandbox);
-		}
+		print_message(
+			'system',
+			`[${criterion.id}] Cleaning up runtime...`,
+		);
+		await runtime.cleanup();
 	}
 }
 
 /**
- * Run criteria in parallel using separate sandboxes
+ * Run criteria in parallel using separate runtimes
  */
 async function orchestrate_parallel(
 	config: RalphConfig,
@@ -602,7 +506,6 @@ async function orchestrate_parallel(
 		`Starting parallel orchestration: ${criteria.length} criteria, max ${max_concurrent} concurrent`,
 	);
 
-	// Create telemetry trace
 	const telem_trace = create_ralph_trace({
 		task: 'parallel-orchestration',
 		features: criteria.map((c) => ({
@@ -617,13 +520,11 @@ async function orchestrate_parallel(
 		budget_tokens: config.budget.max_tokens,
 	});
 
-	// Run criteria in parallel with concurrency limit
 	const results: CriterionResult[] = [];
 	const pending = [...criteria];
 	const running: Promise<CriterionResult>[] = [];
 
 	while (pending.length > 0 || running.length > 0) {
-		// Start new tasks up to max_concurrent
 		while (running.length < max_concurrent && pending.length > 0) {
 			const criterion = pending.shift()!;
 			const index = criteria.indexOf(criterion);
@@ -636,12 +537,10 @@ async function orchestrate_parallel(
 			running.push(promise);
 		}
 
-		// Wait for at least one to complete
 		if (running.length > 0) {
 			const completed = await Promise.race(running);
 			results.push(completed);
 
-			// Remove completed from running
 			const completed_index = running.findIndex(
 				async (p) => (await p).id === completed.id,
 			);
@@ -651,7 +550,6 @@ async function orchestrate_parallel(
 		}
 	}
 
-	// Aggregate results
 	const total_iterations = results.reduce(
 		(sum, r) => sum + r.iterations,
 		0,
@@ -663,7 +561,6 @@ async function orchestrate_parallel(
 	const all_success = results.every((r) => r.status === 'success');
 	const criteria_met = results.map((r) => r.status === 'success');
 
-	// Finalize telemetry
 	finalize_trace(telem_trace, {
 		status: all_success ? 'success' : 'max_iterations',
 		iterations: total_iterations,
@@ -684,7 +581,6 @@ async function orchestrate_parallel(
 		`Results: ${results.filter((r) => r.status === 'success').length}/${criteria.length} succeeded`,
 	);
 
-	// List PRs created
 	const prs = results.filter((r) => r.pr_url).map((r) => r.pr_url);
 	if (prs.length > 0) {
 		print_message('system', `PRs created:`);
@@ -705,10 +601,6 @@ async function orchestrate_parallel(
 
 /**
  * Main orchestration loop
- * Supports three modes:
- * 1. Parallel mode: run each criterion in separate sandbox
- * 2. Sequential mode (default): iterate through acceptance_criteria with steps
- * 3. Single task mode (legacy): run one task until legacy criteria met
  */
 export async function orchestrate(
 	config: RalphConfig,
@@ -722,20 +614,35 @@ export async function orchestrate(
 		return orchestrate_parallel(config);
 	}
 
-	// Initialize telemetry
 	init_telemetry();
-
 	const start_time = Date.now();
 	let iterations = 0;
 	let tokens_used = 0;
 	let criteria_completed = 0;
 
-	// Determine mode - ralph pattern takes priority (sequential)
+	// Validate environment
+	const runtime_type = config.execution?.runtime || 'daytona';
+	const missing_env = validate_runtime_env(runtime_type);
+	if (missing_env.length > 0) {
+		throw new Error(
+			`Missing required env vars: ${missing_env.join(', ')}`,
+		);
+	}
+
+	// Create runtime
+	const runtime = create_runtime({
+		type: runtime_type,
+		on_build_log: (chunk) => {
+			if (chunk.trim()) {
+				print_message('system', `[build] ${chunk.trim()}`);
+			}
+		},
+	});
+
 	const is_ralph_mode =
 		config.acceptance_criteria &&
 		config.acceptance_criteria.length > 0;
 
-	// Create telemetry trace
 	const telem_trace = create_ralph_trace({
 		task: config.task,
 		features: config.acceptance_criteria?.map((c) => ({
@@ -751,6 +658,7 @@ export async function orchestrate(
 			: config.max_iterations || 3,
 		budget_tokens: config.budget.max_tokens,
 	});
+
 	const max_iter = is_ralph_mode
 		? (config.max_iterations_per_criterion || 3) *
 			config.acceptance_criteria!.length
@@ -772,74 +680,54 @@ export async function orchestrate(
 	}
 	print_message(
 		'system',
-		`Max iterations: ${max_iter}, Budget: ${config.budget.max_tokens} tokens`,
+		`Runtime: ${runtime_type}, Max iterations: ${max_iter}, Budget: ${config.budget.max_tokens} tokens`,
 	);
 
-	const daytona = new Daytona();
-	let sandbox: Awaited<ReturnType<Daytona['create']>> | null = null;
-
 	try {
-		// Create sandbox with pre-built image
-		// First run builds image (~30s), subsequent runs use cache (~5s)
-		print_message('system', 'Creating Daytona sandbox...');
-		sandbox = await daytona.create(
-			{
-				image: RALPH_IMAGE,
-				language: 'typescript',
-			},
-			{
-				timeout: 120,
-				onSnapshotCreateLogs: (chunk) => {
-					// Show build progress on first run
-					if (chunk.trim()) {
-						print_message('system', `[build] ${chunk.trim()}`);
-					}
-				},
-			},
-		);
-		print_message('system', `Sandbox created: ${sandbox.id}`);
+		print_message('system', 'Initializing runtime...');
+		await runtime.initialize();
+		print_message('system', `Runtime ready: ${runtime.id}`);
 
-		// Set up sandbox environment (once)
-		await setup_sandbox(sandbox);
+		await setup_runtime(runtime);
 
-		// Set up git if repository configured
 		const has_git = config.repository && config.git;
-		let working_dir = '/home/daytona';
+		let working_dir = runtime.get_workspace();
 
 		if (has_git && config.repository && config.git) {
-			await setup_git(sandbox, config.repository, config.git);
-			working_dir = config.repository.working_dir
-				? `${REPO_PATH}/${config.repository.working_dir}`
-				: REPO_PATH;
+			working_dir = await setup_git(
+				runtime,
+				config.repository,
+				config.git,
+			);
 		}
 
-		// Track previous failure for context passing
+		// Initialize progress tracking
+		if (is_ralph_mode) {
+			await init_progress(runtime, working_dir, config);
+		}
+
 		let previous_failure: string | undefined;
 
-		// Main loop - ralph pattern or legacy single task mode
 		while (iterations < max_iter) {
 			iterations++;
 
-			// Ralph pattern mode (primary)
 			if (is_ralph_mode && config.acceptance_criteria) {
 				const criterion = get_next_criterion(
 					config.acceptance_criteria,
 				);
 
-				// All criteria complete
 				if (!criterion) {
 					print_message(
 						'system',
 						`\n${GREEN}All ${config.acceptance_criteria.length} criteria complete!${RESET}`,
 					);
 
-					// Finalize git with all criteria
 					let pr_url: string | null = null;
 					if (has_git && config.repository && config.git) {
 						const summary = config.acceptance_criteria
 							.map((c) => `- ${c.description}`)
 							.join('\n');
-						await finalize_git(sandbox, config.git, summary);
+						await finalize_git(runtime, config.git, summary);
 						pr_url = await create_pull_request(
 							config.repository,
 							config.git,
@@ -876,24 +764,30 @@ export async function orchestrate(
 				);
 				print_message('system', `Task: ${criterion.description}`);
 
-				// Create telemetry span for this iteration
 				const iter_span = create_iteration_span(
 					telem_trace,
 					iterations,
 					criterion.id,
 				);
-
-				// Convert steps to task string for agent
-				const task = steps_to_task(criterion);
+				// Build enhanced task with progress context
+				const progress_context = await read_progress(
+					runtime,
+					working_dir,
+				);
+				const task = build_task_prompt(
+					criterion,
+					progress_context,
+					previous_failure,
+					['pnpm run build', 'pnpm run check'],
+				);
 				const model = config.execution?.model || 'haiku';
 
-				// Run agent for this criterion (fresh Claude session each time)
 				const agent_gen = create_agent_generation(iter_span, task);
-				const agent_result = await run_agent_in_sandbox(
-					sandbox,
+				const agent_result = await run_agent(
+					runtime,
 					task,
 					working_dir,
-					previous_failure,
+					undefined, // previous_failure now in task prompt
 					model,
 				);
 				if (agent_gen) {
@@ -906,27 +800,35 @@ export async function orchestrate(
 					agent_result.output.slice(0, 500) + '...',
 				);
 
-				// Track actual token usage
 				tokens_used +=
 					agent_result.usage.input_tokens +
 					agent_result.usage.output_tokens;
 
-				// Check backpressure
 				print_message('system', 'Checking backpressure...');
-				const bp_result = await sandbox.process.executeCommand(
+				const bp_result = await runtime.execute(
 					criterion.backpressure,
-					undefined,
-					undefined,
-					120,
+					{
+						cwd: working_dir,
+						timeout: 120000,
+					},
 				);
-				const passed = bp_result.exitCode === 0;
+				const passed = bp_result.exit_code === 0;
 
-				// Record backpressure result in telemetry
+				// Append to progress.txt
+				await append_progress(
+					runtime,
+					working_dir,
+					criterion.id,
+					iterations,
+					agent_result.output,
+					passed,
+				);
+
 				record_backpressure(
 					iter_span,
 					criterion.backpressure,
 					passed,
-					bp_result.result,
+					bp_result.stdout,
 				);
 
 				if (iter_span) {
@@ -936,32 +838,28 @@ export async function orchestrate(
 				if (passed) {
 					criterion.passes = true;
 					criteria_completed++;
-					previous_failure = undefined; // Clear failure context
+					previous_failure = undefined;
 					print_message(
 						'system',
 						`${GREEN}PASS${RESET} - ${criterion.id} complete`,
 					);
 				} else {
-					// Capture failure context for next iteration (1000 chars for better debugging)
-					const error_output = bp_result.result.slice(0, 1000);
+					const error_output = bp_result.stdout.slice(0, 1000);
 					previous_failure = `Backpressure command failed: ${criterion.backpressure}\nOutput: ${error_output}`;
 					print_message(
 						'system',
 						`FAIL - ${criterion.id} backpressure: ${criterion.backpressure}`,
 					);
 				}
-			}
-			// Single task mode (legacy)
-			else if (config.task && config.legacy_criteria) {
+			} else if (config.task && config.legacy_criteria) {
 				print_message(
 					'system',
 					`\n--- Iteration ${iterations}/${max_iter} ---`,
 				);
 
-				// Run the agent
 				const model = config.execution?.model || 'haiku';
-				const agent_result = await run_agent_in_sandbox(
-					sandbox,
+				const agent_result = await run_agent(
+					runtime,
 					config.task,
 					working_dir,
 					undefined,
@@ -972,40 +870,35 @@ export async function orchestrate(
 					agent_result.output.slice(0, 500) + '...',
 				);
 
-				// Track actual token usage
 				tokens_used +=
 					agent_result.usage.input_tokens +
 					agent_result.usage.output_tokens;
 
-				// Check acceptance criteria
 				print_message('system', 'Checking acceptance criteria...');
 				const criteria_results = await check_all_legacy_criteria(
-					sandbox,
+					runtime,
 					config.legacy_criteria,
 				);
 
-				// Report status
 				config.legacy_criteria.forEach((c, i) => {
 					const status = criteria_results[i]
 						? `${GREEN}PASS${RESET}`
-						: `FAIL`;
+						: 'FAIL';
 					print_message(
 						'system',
 						`  ${c.type}: ${c.type === 'file_exists' ? c.path : c.command} - ${status}`,
 					);
 				});
 
-				// Check if all criteria met
 				if (criteria_results.every((m) => m)) {
 					print_message(
 						'system',
 						`\n${GREEN}All acceptance criteria met!${RESET}`,
 					);
 
-					// Finalize git if configured
 					let pr_url: string | null = null;
 					if (has_git && config.repository && config.git) {
-						await finalize_git(sandbox, config.git, config.task);
+						await finalize_git(runtime, config.git, config.task);
 						pr_url = await create_pull_request(
 							config.repository,
 							config.git,
@@ -1026,7 +919,6 @@ export async function orchestrate(
 				}
 			}
 
-			// Budget check
 			if (tokens_used >= config.budget.max_tokens) {
 				print_message('system', 'Budget exhausted');
 				return {
@@ -1043,7 +935,6 @@ export async function orchestrate(
 			}
 		}
 
-		// Max iterations reached
 		print_message('system', 'Max iterations reached');
 		return {
 			status: 'max_iterations',
@@ -1052,7 +943,7 @@ export async function orchestrate(
 				? config.acceptance_criteria!.map((c) => c.passes)
 				: config.legacy_criteria
 					? await check_all_legacy_criteria(
-							sandbox,
+							runtime,
 							config.legacy_criteria,
 						)
 					: [],
@@ -1076,13 +967,8 @@ export async function orchestrate(
 			error: error_msg,
 		};
 	} finally {
-		// Cleanup
-		if (sandbox) {
-			print_message('system', 'Cleaning up sandbox...');
-			await daytona.delete(sandbox);
-		}
-
-		// Flush telemetry
+		print_message('system', 'Cleaning up runtime...');
+		await runtime.cleanup();
 		await flush_telemetry();
 	}
 }

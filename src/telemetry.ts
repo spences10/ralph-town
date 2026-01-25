@@ -1,5 +1,5 @@
 /**
- * Telemetry module for ralph-gas
+ * Telemetry module for ralph-town
  *
  * Uses Langfuse + OpenTelemetry for observability
  */
@@ -72,7 +72,7 @@ export function create_ralph_trace(config: {
 			max_iterations: config.max_iterations,
 			budget_tokens: config.budget_tokens,
 		},
-		tags: ['ralph-gas', 'orchestrator'],
+		tags: ['ralph-town', 'orchestrator'],
 	});
 
 	return trace;

@@ -10,7 +10,7 @@ How developers will actually use this system.
 1. Dev has ticket/epic in their repo (e.g., company-app/)
 2. Dev is in Claude Code session in that repo
 3. Dev (or Claude) creates ralph.json with acceptance criteria
-4. Dev invokes ralph-gas orchestration
+4. Dev invokes ralph-town orchestration
 5. Orchestration runs in Daytona
 6. Agents do work
 7. Results come back as PR
@@ -20,12 +20,12 @@ How developers will actually use this system.
 
 ## Interface Options
 
-| Approach              | How dev invokes                        | Where ralph-gas lives |
+| Approach              | How dev invokes                        | Where ralph-town lives |
 | --------------------- | -------------------------------------- | --------------------- |
 | **MCP server**        | Claude Code calls MCP tool             | Running locally/remote |
-| CLI tool              | `npx @company/ralph-gas run`           | npm package           |
+| CLI tool              | `npx @company/ralph-town run`           | npm package           |
 | Claude Code skill     | `/ralph` in their Claude session       | Skill in their project |
-| API endpoint          | `curl https://ralph-gas.company.com`   | Deployed service      |
+| API endpoint          | `curl https://ralph-town.company.com`   | Deployed service      |
 | VS Code extension     | Button/command in editor               | Extension             |
 
 ---
@@ -57,7 +57,7 @@ How developers will actually use this system.
 └───────────┼─────────────────────────────────────────────┘
             ▼
 ┌─────────────────────────────────────────────────────────┐
-│  ralph-gas MCP server                                   │
+│  ralph-town MCP server                                   │
 │  ┌─────────────────┐                                    │
 │  │  Orchestrator   │───▶ Spins up Daytona sandboxes     │
 │  └─────────────────┘                                    │

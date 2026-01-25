@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ralph-gas",
+      "name": "ralph-town",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.19",
         "@daytonaio/sdk": "^0.134.0",

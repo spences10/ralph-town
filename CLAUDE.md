@@ -1,4 +1,4 @@
-# Ralph-GAS Project Instructions
+# Ralph-Town Project Instructions
 
 Two-agent TypeScript system using Claude Agent SDK with Daytona
 sandbox. Exploring Ralph Loop + Gas Town patterns.
