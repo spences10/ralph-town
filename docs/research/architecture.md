@@ -10,7 +10,7 @@ How the orchestrator relates to Daytona sandboxes.
 ┌─────────────────┐
 │  Local Machine  │
 │  (Orchestrator) │
-│  bun ralph      │
+│ ralph-town run  │
 └────────┬────────┘
          │ creates sandbox
          ▼
@@ -66,17 +66,17 @@ As described in developer-experience.md:
 
 ## Validated Constraints
 
-| Constraint               | Impact                          |
-| ------------------------ | ------------------------------- |
-| Preview tier internet    | Must use npm, not bun/curl      |
-| No snapshot creation     | ~10s npm install each run       |
-| Memory limits (10-20 GB) | Single sandbox at a time        |
-| Single agent per sandbox | No parallel agents in one box   |
+| Constraint               | Impact                        |
+| ------------------------ | ----------------------------- |
+| Preview tier internet    | Must use npm, not bun/curl    |
+| No snapshot creation     | ~10s npm install each run     |
+| Memory limits (10-20 GB) | Single sandbox at a time      |
+| Single agent per sandbox | No parallel agents in one box |
 
 ---
 
 ## Decision
 
-**Option A is the validated working approach.** Simple, functional, and
-works within preview tier constraints. Can evolve to Option B/C when
-resources allow.
+**Option A is the validated working approach.** Simple, functional,
+and works within preview tier constraints. Can evolve to Option B/C
+when resources allow.

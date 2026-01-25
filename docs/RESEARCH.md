@@ -23,7 +23,7 @@ autonomous agent assistance.
 ralph.json → Orchestrator → Daytona Sandbox → Agent → Criteria Check → Success
 ```
 
-See `bun ralph` to run.
+See `ralph-town run` to execute.
 
 ---
 
@@ -163,7 +163,8 @@ Enhanced task prompt includes:
 - Previous failure context
 - Recent progress history
 
-See `src/sandbox-agent.ts` and `src/orchestrator.ts`.
+See `packages/cli/src/core/sandbox-agent.ts` and
+`packages/cli/src/core/orchestrator.ts`.
 
 ---
 
@@ -188,7 +189,8 @@ The Ralph-style prompting works with Daytona. Need to validate:
 
 ### Internal
 
-- `src/orchestrator.ts` - Main Ralph Loop implementation
-- `src/sandbox-agent.ts` - Developer agent running in sandbox
-- `src/types.ts` - Type definitions for ralph.json
-- `ralph.json` - Example task configuration
+- `packages/cli/src/core/orchestrator.ts` - Main Ralph Loop
+  implementation
+- `packages/cli/src/core/sandbox-agent.ts` - Developer agent running
+  in sandbox
+- `packages/cli/src/core/types.ts` - Type definitions for ralph.json

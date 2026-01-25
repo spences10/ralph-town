@@ -20,13 +20,13 @@ How developers will actually use this system.
 
 ## Interface Options
 
-| Approach              | How dev invokes                        | Where ralph-town lives |
-| --------------------- | -------------------------------------- | --------------------- |
-| **MCP server**        | Claude Code calls MCP tool             | Running locally/remote |
-| CLI tool              | `npx @company/ralph-town run`           | npm package           |
-| Claude Code skill     | `/ralph` in their Claude session       | Skill in their project |
-| API endpoint          | `curl https://ralph-town.company.com`   | Deployed service      |
-| VS Code extension     | Button/command in editor               | Extension             |
+| Approach          | How dev invokes                       | Where ralph-town lives |
+| ----------------- | ------------------------------------- | ---------------------- |
+| **MCP server**    | Claude Code calls MCP tool            | Running locally/remote |
+| CLI tool          | `npx ralph-town run`                  | npm package            |
+| Claude Code skill | `/ralph` in their Claude session      | Skill in their project |
+| API endpoint      | `curl https://ralph-town.company.com` | Deployed service       |
+| VS Code extension | Button/command in editor              | Extension              |
 
 ---
 
