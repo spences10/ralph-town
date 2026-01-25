@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"ralph-town": {
+			"command": "npx",
+			"args": ["-y", "mcp-ralph-town"]
+		}
+	}
+}
