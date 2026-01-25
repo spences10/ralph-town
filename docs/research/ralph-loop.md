@@ -45,7 +45,8 @@ This means:
 - External state persists via git and spec files
 
 In canonical Ralph, the agent reads `fix_plan.md` to understand state.
-In ralph-town, the orchestrator passes state via task arguments instead.
+In ralph-town, the orchestrator passes state via task arguments
+instead.
 
 ---
 
@@ -175,25 +176,34 @@ updates the plan, commits. Lean loop that runs repeatedly.
 
 ### Our Approach (Ralph + Gas Town)
 
-Unlike canonical Ralph (which uses file-based state via `fix_plan.md`),
-ralph-town uses **orchestrator-managed state**:
+Unlike canonical Ralph (which uses file-based state via
+`fix_plan.md`), ralph-town uses **orchestrator-managed state**:
 
-- **Orchestrator** tracks feature status in memory (`config.features[].passes`)
-- **Orchestrator** picks the next feature and passes task as CLI argument
+- **Orchestrator** tracks feature status in memory
+  (`config.features[].passes`)
+- **Orchestrator** picks the next feature and passes task as CLI
+  argument
 - **Agent** executes the task (fresh Claude session each time)
 - **Orchestrator** checks backpressure and updates state
 - **Gas Town** budget controls limit iterations and token usage
 
 This is a hybrid: Ralph's fresh-context-per-iteration pattern combined
-with Gas Town's resource management, but without file-based state passing.
+with Gas Town's resource management, but without file-based state
+passing.
 
-The agent receives only the task string - no fix_plan.md, no specs folder.
-State lives in the orchestrator, not in the sandbox filesystem.
+The agent receives only the task string - no fix_plan.md, no specs
+folder. State lives in the orchestrator, not in the sandbox
+filesystem.
 
 ### ralph.json Schema
 
+Full schema: [`ralph.schema.json`](/ralph.schema.json)
+
+Copy `ralph.example.json` to `ralph.json` and customize.
+
 ```json
 {
+	"$schema": "./ralph.schema.json",
 	"repository": {
 		"url": "https://github.com/user/repo.git",
 		"branch": "main"
@@ -202,16 +212,25 @@ State lives in the orchestrator, not in the sandbox filesystem.
 		"feature_branch": "feature/my-feature",
 		"create_pr": true
 	},
-	"features": [
+	"execution": {
+		"mode": "parallel",
+		"max_concurrent": 3,
+		"model": "haiku"
+	},
+	"acceptance_criteria": [
 		{
-			"id": "feat-001",
+			"id": "ac-001",
 			"description": "Add health check API endpoint",
-			"task": "Create /api/health endpoint returning { status: 'ok' }",
-			"backpressure": "cd /home/daytona/workspace && npm run build && curl -sf http://localhost:5173/api/health",
+			"steps": [
+				"Create src/routes/api/health/+server.ts",
+				"Return JSON { status: 'ok' }",
+				"Run build to verify"
+			],
+			"backpressure": "pnpm run build && curl -sf http://localhost:5173/api/health",
 			"passes": false
 		}
 	],
-	"max_iterations_per_feature": 3,
+	"max_iterations_per_criterion": 3,
 	"budget": { "max_tokens": 50000 }
 }
 ```
