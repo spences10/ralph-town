@@ -1,0 +1,24 @@
+{
+	"name": "ralph-town",
+	"version": "0.0.0",
+	"type": "module",
+	"description": "CLI for Ralph Loop - autonomous agent orchestration",
+	"bin": {
+		"ralph": "./dist/index.js"
+	},
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "tsc",
+		"dev": "bun src/index.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@ralph-town/core": "workspace:*",
+		"citty": "^0.1.6",
+		"dotenv": "^17.2.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"typescript": "^5.9.3"
+	}
+}
