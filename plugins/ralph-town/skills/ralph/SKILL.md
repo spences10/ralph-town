@@ -9,48 +9,34 @@ description: Use when setting up Ralph Loop orchestration, creating ralph.json c
 Autonomous agent orchestration iterating until acceptance criteria
 pass.
 
+## MANDATORY - Ask Before Proceeding
+
+**You MUST ask and wait for answers before running:**
+
+1. **Runtime?** local / daytona / devcontainer
+2. **Mode?** sequential / parallel
+3. **Max concurrent?** (if parallel, default: 3)
+4. **Model?** haiku (default) / sonnet / opus
+5. **Review criteria before run?**
+
+**Do NOT proceed until answered.**
+
 ## Quick Start
 
-```bash
-npx ralph-town init    # Create ralph.json
-npx ralph-town run     # Execute loop
-```
-
-## Core Schema
-
-```json
-{
-	"repository": { "url": "...", "branch": "main" },
-	"execution": {
-		"mode": "sequential",
-		"runtime": "local",
-		"model": "haiku"
-	},
-	"acceptance_criteria": [
-		{
-			"id": "ac-001",
-			"description": "What to achieve",
-			"steps": ["Instructions for agent"],
-			"backpressure": "pnpm run build",
-			"passes": false
-		}
-	],
-	"max_iterations_per_criterion": 3
-}
-```
-
-## Backpressure
-
-Good: verifies runtime behavior (exit 0 = pass)
+Detect package manager (bun/pnpm/npm/yarn):
 
 ```bash
-pnpm run build && pnpm test
+<pkg> x ralph-town init    # Create ralph.json
+<pkg> x ralph-town run     # Execute loop
 ```
+
+## Schema
+
+See [schema-reference.md](references/schema-reference.md)
 
 ## References
 
-- [cli-reference.md](references/cli-reference.md) - Commands, env vars
-- [schema-reference.md](references/schema-reference.md) - Full schema
-  details
-- [backpressure-patterns.md](references/backpressure-patterns.md) -
-  Verification patterns
+- [cli-reference.md](references/cli-reference.md)
+- [schema-reference.md](references/schema-reference.md)
+- [backpressure-patterns.md](references/backpressure-patterns.md)
+- [setup-guide.md](references/setup-guide.md)
