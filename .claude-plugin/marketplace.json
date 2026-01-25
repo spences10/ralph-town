@@ -25,7 +25,13 @@
 				"automation",
 				"claude",
 				"daytona"
-			]
+			],
+			"mcpServers": {
+				"ralph-town": {
+					"command": "npx",
+					"args": ["mcp-ralph-town"]
+				}
+			}
 		}
 	]
 }

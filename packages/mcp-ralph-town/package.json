@@ -28,7 +28,7 @@
 		"@tmcp/adapter-valibot": "^0.1.5",
 		"@tmcp/transport-stdio": "*",
 		"valibot": "^1.0.0",
-		"ralph-town": "workspace:*"
+		"ralph-town": "^0.0.5"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",
