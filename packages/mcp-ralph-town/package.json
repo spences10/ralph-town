@@ -1,0 +1,37 @@
+{
+	"name": "mcp-ralph-town",
+	"version": "0.0.0",
+	"type": "module",
+	"description": "MCP server wrapping Ralph Loop CLI",
+	"bin": {
+		"mcp-ralph-town": "./dist/index.js"
+	},
+	"main": "dist/index.js",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"author": "Scott Spence",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/spences10/ralph-town.git",
+		"directory": "packages/mcp-ralph-town"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "bun src/index.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"tmcp": "^1.18.1",
+		"@tmcp/adapter-valibot": "^0.1.5",
+		"@tmcp/transport-stdio": "*",
+		"valibot": "^1.0.0",
+		"ralph-town": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"typescript": "^5.9.3"
+	}
+}
