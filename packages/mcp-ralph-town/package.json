@@ -24,14 +24,14 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"tmcp": "^1.18.1",
+		"tmcp": "^1.19.2",
 		"@tmcp/adapter-valibot": "^0.1.5",
 		"@tmcp/transport-stdio": "*",
-		"valibot": "^1.0.0",
+		"valibot": "^1.2.0",
 		"ralph-town": "^0.0.5"
 	},
 	"devDependencies": {
-		"@types/node": "^22.0.0",
+		"@types/node": "^25.0.10",
 		"typescript": "^5.9.3"
 	}
 }
