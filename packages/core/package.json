@@ -1,6 +1,6 @@
 {
 	"name": "@ralph-town/core",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"type": "module",
 	"description": "Core orchestrator and runtimes for Ralph Loop",
 	"main": "dist/index.js",
