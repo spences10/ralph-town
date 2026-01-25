@@ -1,6 +1,6 @@
 {
 	"name": "ralph-sandbox",
-	"image": "node:22-slim",
+	"image": "node:24-slim",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"configureZshAsDefaultShell": true
