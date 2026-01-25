@@ -8,6 +8,14 @@ description: Explore a codebase before running ralph. Identifies paths, structur
 
 Explore a codebase to generate accurate ralph.json configuration.
 
+## Quick Start
+
+```bash
+# Detect project type and paths
+ls *.config.* package.json pnpm-lock.yaml 2>/dev/null
+cat package.json | jq '.scripts'
+```
+
 ## When to Use
 
 - Before creating a new ralph.json

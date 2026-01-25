@@ -1,0 +1,31 @@
+{
+	"name": "ralph-town-marketplace",
+	"owner": {
+		"name": "Scott Spence",
+		"email": "spences10apps@gmail.com"
+	},
+	"metadata": {
+		"description": "Ralph Loop - autonomous agent orchestration plugins",
+		"version": "0.0.1"
+	},
+	"plugins": [
+		{
+			"name": "ralph-town",
+			"source": "./plugins/ralph-town",
+			"description": "Ralph Loop CLI for autonomous agent orchestration with acceptance criteria iteration",
+			"version": "0.0.1",
+			"author": { "name": "Scott Spence" },
+			"homepage": "https://github.com/spences10/ralph-town",
+			"repository": "https://github.com/spences10/ralph-town",
+			"license": "MIT",
+			"keywords": [
+				"agent",
+				"orchestration",
+				"ralph-loop",
+				"automation",
+				"claude",
+				"daytona"
+			]
+		}
+	]
+}

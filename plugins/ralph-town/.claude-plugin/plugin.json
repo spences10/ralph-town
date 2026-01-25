@@ -1,0 +1,20 @@
+{
+	"name": "ralph-town",
+	"description": "Ralph Loop - autonomous agent orchestration with acceptance criteria iteration",
+	"version": "0.0.1",
+	"author": {
+		"name": "Scott Spence",
+		"email": "spences10apps@gmail.com"
+	},
+	"homepage": "https://github.com/spences10/ralph-town",
+	"repository": "https://github.com/spences10/ralph-town",
+	"license": "MIT",
+	"keywords": [
+		"agent",
+		"orchestration",
+		"ralph-loop",
+		"automation",
+		"claude",
+		"daytona"
+	]
+}
