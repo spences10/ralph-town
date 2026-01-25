@@ -96,6 +96,84 @@ async function check_all_legacy_criteria(
 
 // Fixed path for sandbox agent (outside workspace to avoid clone conflicts)
 const SANDBOX_AGENT_PATH = '/home/daytona/sandbox-agent.ts';
+const PROGRESS_FILE = 'progress.txt';
+
+/**
+ * Initialize progress.txt in the working directory
+ */
+async function init_progress(
+	runtime: RuntimeEnvironment,
+	working_dir: string,
+	config: RalphConfig,
+): Promise<void> {
+	const header = `# Ralph Progress Log
+# Started: ${new Date().toISOString()}
+# Repository: ${config.repository?.url || 'local'}
+
+## Criteria
+${config.acceptance_criteria?.map((c) => `- [ ] ${c.id}: ${c.description}`).join('\n') || 'None'}
+
+---
+`;
+	await runtime.write_file(`${working_dir}/${PROGRESS_FILE}`, header);
+}
+
+/**
+ * Append iteration result to progress.txt
+ */
+async function append_progress(
+	runtime: RuntimeEnvironment,
+	working_dir: string,
+	criterion_id: string,
+	iteration: number,
+	agent_output: string,
+	passed: boolean,
+): Promise<void> {
+	// Extract progress block from agent output
+	const progress_match = agent_output.match(
+		/```progress\n([\s\S]*?)```/,
+	);
+	const progress_content = progress_match
+		? progress_match[1].trim()
+		: 'No progress block found';
+
+	const entry = `
+## Iteration ${iteration} - ${criterion_id} (${passed ? 'PASS' : 'FAIL'})
+Time: ${new Date().toISOString()}
+
+${progress_content}
+
+---
+`;
+
+	// Read existing content and append
+	const path = `${working_dir}/${PROGRESS_FILE}`;
+	let existing = '';
+	try {
+		const result = await runtime.execute(`cat "${path}"`);
+		existing = result.stdout;
+	} catch {
+		// File might not exist
+	}
+
+	await runtime.write_file(path, existing + entry);
+}
+
+/**
+ * Read current progress.txt content
+ */
+async function read_progress(
+	runtime: RuntimeEnvironment,
+	working_dir: string,
+): Promise<string> {
+	const path = `${working_dir}/${PROGRESS_FILE}`;
+	try {
+		const result = await runtime.execute(`cat "${path}"`);
+		return result.stdout;
+	} catch {
+		return '';
+	}
+}
 
 /**
  * Set up the runtime environment
@@ -156,6 +234,50 @@ function parse_agent_usage(output: string): AgentExecutionResult {
 }
 
 /**
+ * Build enhanced task prompt with context
+ */
+function build_task_prompt(
+	criterion: RalphCriterion,
+	progress_context: string,
+	previous_failure?: string,
+	feedback_commands?: string[],
+): string {
+	const steps_text = criterion.steps
+		.map((s, i) => `${i + 1}. ${s}`)
+		.join('\n');
+
+	const feedback_section = feedback_commands?.length
+		? `\n## Feedback Commands to Run
+${feedback_commands.map((c) => `- \`${c}\``).join('\n')}`
+		: '';
+
+	const failure_section = previous_failure
+		? `\n## Previous Attempt Failed
+${previous_failure}
+Fix this issue in this iteration.`
+		: '';
+
+	const progress_section = progress_context
+		? `\n## Progress So Far
+\`\`\`
+${progress_context.slice(-2000)}
+\`\`\``
+		: '';
+
+	return `# Task: ${criterion.description}
+
+## Steps
+${steps_text}
+
+## Backpressure Check
+This command must pass for the task to be considered complete:
+\`${criterion.backpressure}\`
+${feedback_section}${failure_section}${progress_section}
+
+Remember: Explore first, then execute, then verify with feedback loops.`;
+}
+
+/**
  * Run the agent task in the runtime
  */
 async function run_agent(
@@ -165,17 +287,12 @@ async function run_agent(
 	previous_failure?: string,
 	model: string = 'haiku',
 ): Promise<AgentExecutionResult> {
-	let full_task = task;
-	if (previous_failure) {
-		full_task = `${task}\n\nNOTE: Previous attempt failed. ${previous_failure}`;
-	}
-
 	print_message(
 		'system',
 		`Running agent (${model}) with task: ${task.slice(0, 100)}...`,
 	);
 
-	const escaped_task = full_task
+	const escaped_task = task
 		.replace(/"/g, '\\"')
 		.replace(/\n/g, '\\n');
 	const work_dir = working_dir || runtime.get_workspace();
@@ -237,6 +354,9 @@ async function run_criterion_isolated(
 			);
 		}
 
+		// Initialize progress tracking
+		await init_progress(runtime, working_dir, config);
+
 		let previous_failure: string | undefined;
 
 		while (iterations < max_iter) {
@@ -246,13 +366,23 @@ async function run_criterion_isolated(
 				`[${criterion.id}] Iteration ${iterations}/${max_iter}`,
 			);
 
-			const task = steps_to_task(criterion);
+			// Read current progress and build enhanced task
+			const progress_context = await read_progress(
+				runtime,
+				working_dir,
+			);
+			const task = build_task_prompt(
+				criterion,
+				progress_context,
+				previous_failure,
+				['pnpm run build', 'pnpm run check'],
+			);
 			const model = config.execution?.model || 'haiku';
 			const agent_result = await run_agent(
 				runtime,
 				task,
 				working_dir,
-				previous_failure,
+				undefined, // previous_failure now in task prompt
 				model,
 			);
 
@@ -272,6 +402,16 @@ async function run_criterion_isolated(
 				},
 			);
 			const passed = bp_result.exit_code === 0;
+
+			// Append to progress.txt
+			await append_progress(
+				runtime,
+				working_dir,
+				criterion.id,
+				iterations,
+				agent_result.output,
+				passed,
+			);
 
 			if (passed) {
 				print_message(
@@ -561,6 +701,11 @@ export async function orchestrate(
 			);
 		}
 
+		// Initialize progress tracking
+		if (is_ralph_mode) {
+			await init_progress(runtime, working_dir, config);
+		}
+
 		let previous_failure: string | undefined;
 
 		while (iterations < max_iter) {
@@ -624,7 +769,17 @@ export async function orchestrate(
 					iterations,
 					criterion.id,
 				);
-				const task = steps_to_task(criterion);
+				// Build enhanced task with progress context
+				const progress_context = await read_progress(
+					runtime,
+					working_dir,
+				);
+				const task = build_task_prompt(
+					criterion,
+					progress_context,
+					previous_failure,
+					['pnpm run build', 'pnpm run check'],
+				);
 				const model = config.execution?.model || 'haiku';
 
 				const agent_gen = create_agent_generation(iter_span, task);
@@ -632,7 +787,7 @@ export async function orchestrate(
 					runtime,
 					task,
 					working_dir,
-					previous_failure,
+					undefined, // previous_failure now in task prompt
 					model,
 				);
 				if (agent_gen) {
@@ -658,6 +813,16 @@ export async function orchestrate(
 					},
 				);
 				const passed = bp_result.exit_code === 0;
+
+				// Append to progress.txt
+				await append_progress(
+					runtime,
+					working_dir,
+					criterion.id,
+					iterations,
+					agent_result.output,
+					passed,
+				);
 
 				record_backpressure(
 					iter_span,

@@ -1,0 +1,63 @@
+{
+	"repository": {
+		"url": "https://github.com/spences10/sveltekit-skeleton.git",
+		"branch": "main"
+	},
+	"git": {
+		"feature_branch": "feature/parallel-test",
+		"commit_author": "Ralph Agent",
+		"commit_email": "ralph@example.com",
+		"create_pr": true
+	},
+	"execution": {
+		"mode": "parallel",
+		"max_concurrent": 3,
+		"model": "haiku"
+	},
+	"acceptance_criteria": [
+		{
+			"id": "ac-001",
+			"description": "Update all outdated dependencies",
+			"steps": [
+				"Run pnpm outdated to identify stale packages",
+				"Update package.json with latest versions",
+				"Run pnpm install",
+				"Verify no breaking changes with pnpm run build"
+			],
+			"backpressure": "pnpm run build",
+			"passes": false
+		},
+		{
+			"id": "ac-002",
+			"description": "Install and configure daisyUI for Tailwind v4",
+			"steps": [
+				"Install daisyui as dev dependency",
+				"Find the main CSS file (likely src/routes/layout.css or src/app.css)",
+				"Import daisyui using @plugin directive in the CSS file",
+				"Configure daisyUI themes (light, dark) via @plugin options",
+				"Verify daisyUI classes work in build"
+			],
+			"backpressure": "grep -rq '@plugin.*daisyui' src/ && pnpm run build",
+			"passes": false
+		},
+		{
+			"id": "ac-003",
+			"description": "Add theme toggle component with cookie persistence",
+			"steps": [
+				"Create src/lib directory structure if not exists",
+				"Create theme state file (src/lib/theme.svelte.ts) with $state for theme",
+				"Create ThemeToggle.svelte component using daisyUI toggle/swap",
+				"Read theme from cookie in hooks.server.ts or +layout.server.ts",
+				"Set data-theme on html element in app.html with SSR-safe approach",
+				"Update cookie on toggle via form action or fetch",
+				"Import and add ThemeToggle to the layout"
+			],
+			"backpressure": "test -f src/lib/theme.svelte.ts && find src -name 'ThemeToggle.svelte' | grep -q . && grep -rq 'ThemeToggle' src/routes/ && pnpm run build",
+			"passes": false
+		}
+	],
+	"max_iterations_per_feature": 3,
+	"budget": {
+		"max_tokens": 50000
+	}
+}

@@ -16,7 +16,7 @@ Research on Daytona SDK features relevant to orchestration.
 | bun.sh access     | Blocked            | Allowed           |
 | npm registry      | Allowed            | Allowed           |
 
-**Implications for Ralph-GAS:**
+**Implications for Ralph-Town:**
 
 - Use npm/node instead of bun (npm registry is allowed)
 - Can't create custom snapshots on preview tier

@@ -45,7 +45,7 @@ This means:
 - External state persists via git and spec files
 
 In canonical Ralph, the agent reads `fix_plan.md` to understand state.
-In ralph-gas, the orchestrator passes state via task arguments instead.
+In ralph-town, the orchestrator passes state via task arguments instead.
 
 ---
 
@@ -171,12 +171,12 @@ updates the plan, commits. Lean loop that runs repeatedly.
 
 ---
 
-## Implementation: ralph-gas
+## Implementation: ralph-town
 
 ### Our Approach (Ralph + Gas Town)
 
 Unlike canonical Ralph (which uses file-based state via `fix_plan.md`),
-ralph-gas uses **orchestrator-managed state**:
+ralph-town uses **orchestrator-managed state**:
 
 - **Orchestrator** tracks feature status in memory (`config.features[].passes`)
 - **Orchestrator** picks the next feature and passes task as CLI argument

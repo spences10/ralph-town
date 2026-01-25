@@ -126,10 +126,17 @@ class DeveloperAgent {
 	}
 }
 
+// Snapshot name - create with: bun src/create-snapshot.ts
+const SNAPSHOT_NAME = 'ralph-town-dev';
+
 async function setup_sandbox(daytona: Daytona): Promise<Sandbox> {
-	print_message('system', 'Creating Daytona sandbox...');
+	print_message(
+		'system',
+		'Creating Daytona sandbox from snapshot...',
+	);
 
 	const sandbox = await daytona.create({
+		snapshot: SNAPSHOT_NAME,
 		language: 'typescript',
 		envVars: {
 			ANTHROPIC_API_KEY:
@@ -140,22 +147,6 @@ async function setup_sandbox(daytona: Daytona): Promise<Sandbox> {
 	});
 
 	print_message('system', `Sandbox created: ${sandbox.id}`);
-
-	// Install Bun and dependencies in sandbox
-	print_message('system', 'Installing Bun in sandbox...');
-
-	await sandbox.process.executeCommand(
-		'curl -fsSL https://bun.sh/install | bash && export BUN_INSTALL="$HOME/.bun" && export PATH="$BUN_INSTALL/bin:$PATH"',
-	);
-
-	print_message(
-		'system',
-		'Installing Claude Agent SDK in sandbox...',
-	);
-
-	await sandbox.process.executeCommand(
-		'cd /home/daytona && export PATH="$HOME/.bun/bin:$PATH" && bun init -y && bun add @anthropic-ai/claude-agent-sdk',
-	);
 
 	// Upload sandbox agent code
 	print_message('system', 'Uploading sandbox agent...');

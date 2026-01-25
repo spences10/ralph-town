@@ -43,7 +43,7 @@ async function run_agent(task: string) {
 	with propagate_attributes({
 		user_id: 'user_123',
 		session_id: 'session_abc',
-		tags: ['ralph-gas', 'test-run'],
+		tags: ['ralph-town', 'test-run'],
 		metadata: { task_type: 'refactor' },
 	}) {
 		// Agent code here
@@ -85,7 +85,7 @@ Industry-standard observability. More backends, more control.
 import { trace } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
-const tracer = trace.getTracer('ralph-gas');
+const tracer = trace.getTracer('ralph-town');
 
 async function run_agent(task: string) {
 	return tracer.startActiveSpan('agent.run', async (span) => {
@@ -216,7 +216,7 @@ const langfuse = new LangfuseClient();
 
 // List traces with filters
 const traces = await langfuse.api.trace.list({
-	tags: ['ralph-gas'],
+	tags: ['ralph-town'],
 	limit: 100,
 	fromTimestamp: '2025-01-01T00:00:00Z',
 	orderBy: 'timestamp.desc',

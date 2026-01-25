@@ -1,5 +1,5 @@
 /**
- * Ralph-GAS type definitions
+ * Ralph-Town type definitions
  */
 
 // Ralph acceptance criterion (primary format)
