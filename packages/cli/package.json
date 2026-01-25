@@ -1,6 +1,6 @@
 {
 	"name": "ralph-town",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"type": "module",
 	"description": "CLI for Ralph Loop - autonomous agent orchestration",
 	"bin": {
@@ -23,7 +23,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@ralph-town/core": "workspace:*",
+		"@ralph-town/core": "workspace:^",
 		"citty": "^0.1.6",
 		"dotenv": "^17.2.3"
 	},
