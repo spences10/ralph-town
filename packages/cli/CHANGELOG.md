@@ -1,5 +1,11 @@
 # ralph-town
 
+## 0.0.5
+
+### Patch Changes
+
+- 9843e2e: symlink readme
+
 ## 0.0.4
 
 ### Patch Changes

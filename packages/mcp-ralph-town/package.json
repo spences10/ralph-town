@@ -1,6 +1,6 @@
 {
 	"name": "mcp-ralph-town",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"type": "module",
 	"description": "MCP server wrapping Ralph Loop CLI",
 	"bin": {
