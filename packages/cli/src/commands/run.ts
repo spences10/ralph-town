@@ -47,7 +47,7 @@ export default defineCommand({
 		},
 	},
 	async run({ args }) {
-		const { run_ralph_loop } = await import('@ralph-town/core');
+		const { run_ralph_loop } = await import('../core/index.js');
 		const { readFile } = await import('fs/promises');
 		const { resolve } = await import('path');
 

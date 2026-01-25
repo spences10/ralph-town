@@ -13,37 +13,23 @@
     },
     "packages/cli": {
       "name": "ralph-town",
-      "version": "0.0.1",
+      "version": "0.0.3",
       "bin": {
-        "ralph": "./dist/index.js",
+        "ralph-town": "./dist/index.js",
       },
-      "dependencies": {
-        "@ralph-town/core": "workspace:*",
-        "citty": "^0.1.6",
-        "dotenv": "^17.2.3",
-      },
-      "devDependencies": {
-        "@types/node": "^22.0.0",
-        "typescript": "^5.9.3",
-      },
-    },
-    "packages/core": {
-      "name": "@ralph-town/core",
-      "version": "0.0.1",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.19",
         "@daytonaio/sdk": "^0.134.0",
         "@langfuse/client": "^4.5.1",
         "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/sdk-node": "^0.211.0",
+        "citty": "^0.1.6",
+        "dotenv": "^17.2.3",
         "langfuse": "^3.38.6",
       },
       "devDependencies": {
         "@types/node": "^22.0.0",
         "typescript": "^5.9.3",
-      },
-      "peerDependencies": {
-        "dotenv": "^17.0.0",
       },
     },
   },
@@ -309,8 +295,6 @@
     "@protobufjs/pool": ["@protobufjs/pool@1.1.0", "", {}, "sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw=="],
 
     "@protobufjs/utf8": ["@protobufjs/utf8@1.1.0", "", {}, "sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw=="],
-
-    "@ralph-town/core": ["@ralph-town/core@workspace:packages/core"],
 
     "@smithy/abort-controller": ["@smithy/abort-controller@4.2.8", "", { "dependencies": { "@smithy/types": "4.12.0", "tslib": "2.8.1" } }, "sha512-peuVfkYHAmS5ybKxWcfraK7WBBP0J+rkfUcbHJJKQ4ir3UAUNQI+Y4Vt/PqSzGqgloJ5O1dk7+WzNL8wcCSXbw=="],
 
