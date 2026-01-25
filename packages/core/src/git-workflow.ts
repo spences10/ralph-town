@@ -127,11 +127,17 @@ export async function finalize_git(
 
 	print_message('system', 'Staging changes...');
 
-	// Stage all changed files
-	const files_to_add = status.files.map((f) => f.name);
-	if (files_to_add.length > 0) {
-		await runtime.git.add(files_to_add);
+	// Stage all changed files except progress.txt (runtime state, not code)
+	const files_to_add = status.files
+		.map((f) => f.name)
+		.filter((f) => !f.endsWith('progress.txt'));
+
+	if (files_to_add.length === 0) {
+		print_message('system', 'No code changes to commit (only progress.txt)');
+		return;
 	}
+
+	await runtime.git.add(files_to_add);
 
 	// Generate commit message
 	const message = git.commit_message || `feat: ${task.slice(0, 50)}`;

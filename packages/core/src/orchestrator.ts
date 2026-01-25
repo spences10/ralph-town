@@ -973,6 +973,46 @@ export async function orchestrate(
 	}
 }
 
+/**
+ * CLI-friendly wrapper for orchestrate
+ * Handles runtime override and returns simplified result
+ */
+export interface RunResult {
+	success: boolean;
+	iterations?: number;
+	error?: string;
+	pr_url?: string | null;
+}
+
+export async function run_ralph_loop(
+	config: RalphConfig,
+	runtime_override?: 'local' | 'daytona' | 'devcontainer',
+): Promise<RunResult> {
+	// Apply runtime override
+	if (runtime_override) {
+		config.execution = config.execution || { mode: 'sequential' };
+		config.execution.runtime = runtime_override;
+	}
+
+	// Ensure budget exists
+	config.budget = config.budget || { max_tokens: 100000 };
+
+	try {
+		const result = await orchestrate(config);
+		return {
+			success: result.status === 'success',
+			iterations: result.iterations,
+			pr_url: result.pr_url,
+			error: result.error,
+		};
+	} catch (err) {
+		return {
+			success: false,
+			error: err instanceof Error ? err.message : String(err),
+		};
+	}
+}
+
 // CLI entry point
 if (import.meta.url === `file://${process.argv[1]}`) {
 	const config_path = process.argv[2] || 'ralph.json';
