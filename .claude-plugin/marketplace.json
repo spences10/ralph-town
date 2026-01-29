@@ -5,14 +5,14 @@
 		"email": "spences10apps@gmail.com"
 	},
 	"metadata": {
-		"description": "Ralph Loop - autonomous agent orchestration plugins",
+		"description": "Daytona sandbox CLI for Claude Code teams",
 		"version": "0.0.1"
 	},
 	"plugins": [
 		{
 			"name": "ralph-town",
 			"source": "./plugins/ralph-town",
-			"description": "Ralph Loop CLI for autonomous agent orchestration with acceptance criteria iteration",
+			"description": "Daytona sandbox CLI for Claude Code teams",
 			"version": "0.0.1",
 			"author": { "name": "Scott Spence" },
 			"homepage": "https://github.com/spences10/ralph-town",
@@ -21,7 +21,7 @@
 			"keywords": [
 				"agent",
 				"orchestration",
-				"ralph-loop",
+				"sandbox",
 				"automation",
 				"claude",
 				"daytona"
