@@ -44,6 +44,23 @@ export async function create_sandbox(
 ): Promise<Sandbox> {
 	const daytona = create_daytona_client();
 
+	// If snapshot provided, use it directly (fast path)
+	if (options.snapshot) {
+		const sandbox = await daytona.create(
+			{
+				snapshot: options.snapshot,
+				language: 'typescript',
+				envVars: options.env_vars,
+				labels: options.labels,
+				autoStopInterval: options.auto_stop_interval,
+			},
+			{
+				timeout: options.timeout ?? DEFAULT_TIMEOUT,
+			},
+		);
+		return new Sandbox(daytona, sandbox);
+	}
+
 	// Determine the image to use
 	let image: string | Image;
 
