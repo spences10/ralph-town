@@ -34,6 +34,13 @@ async function create_snapshot(): Promise<void> {
 			'curl -fsSL https://bun.sh/install | bash',
 			// Create working directory
 			'mkdir -p /home/daytona',
+			// Fix PATH for SSH sessions - multiple approaches for reliability:
+			// 1. /etc/environment - read by PAM for all sessions
+			'echo "PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin" > /etc/environment',
+			// 2. /etc/profile.d/ - for login shells
+			'echo "export PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin:\\$PATH" > /etc/profile.d/path.sh',
+			// 3. .bashrc - for interactive shells
+			'echo "export PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin:\\$PATH" >> /root/.bashrc',
 		)
 		.env({ PATH: '/root/.bun/bin:$PATH' })
 		.workdir('/home/daytona')
