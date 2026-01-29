@@ -24,6 +24,10 @@ export default defineCommand({
 			type: 'string',
 			description: 'Deletion timeout in seconds (default: 60)',
 		},
+		json: {
+			type: 'boolean',
+			description: 'Output as JSON',
+		},
 	},
 	async run({ args }) {
 		let daytona;
@@ -31,7 +35,11 @@ export default defineCommand({
 			daytona = create_daytona_client();
 		} catch (error) {
 			if (is_missing_api_key_error(error)) {
-				console.error(`Error: ${error.message}`);
+				if (args.json) {
+					console.error(JSON.stringify({ error: error.message }));
+				} else {
+					console.error('Error: ' + error.message);
+				}
 				process.exit(1);
 			}
 			throw error;
@@ -39,8 +47,15 @@ export default defineCommand({
 		const sandbox = await daytona.get(args.id);
 		const timeout = args.timeout ? parseInt(args.timeout, 10) : 60;
 
-		console.log(`Deleting sandbox ${args.id}...`);
+		if (!args.json) {
+			console.log('Deleting sandbox ' + args.id + '...');
+		}
 		await daytona.delete(sandbox, timeout);
-		console.log('Sandbox deleted successfully.');
+		
+		if (args.json) {
+			console.log(JSON.stringify({ id: args.id, deleted: true }));
+		} else {
+			console.log('Sandbox deleted successfully.');
+		}
 	},
 });

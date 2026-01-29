@@ -31,6 +31,10 @@ export default defineCommand({
 			type: 'string',
 			description: 'Creation timeout in seconds (default: 120)',
 		},
+		json: {
+			type: 'boolean',
+			description: 'Output as JSON',
+		},
 	},
 	async run({ args }) {
 		const auto_stop = args['auto-stop']
@@ -38,7 +42,9 @@ export default defineCommand({
 			: undefined;
 		const timeout = args.timeout ? parseInt(args.timeout, 10) : undefined;
 
-		console.log('Creating sandbox...');
+		if (!args.json) {
+			console.log('Creating sandbox...');
+		}
 
 		try {
 			const sandbox = await create_sandbox({
@@ -46,20 +52,32 @@ export default defineCommand({
 				auto_stop_interval: auto_stop,
 				timeout,
 				labels: args.name ? { name: args.name } : undefined,
-				on_build_log: (chunk) => process.stdout.write(chunk),
+				on_build_log: args.json ? undefined : (chunk) => process.stdout.write(chunk),
 			});
 
-			console.log(`\nSandbox created successfully!`);
-			console.log(`ID: ${sandbox.id}`);
-			console.log(`State: ${sandbox.state}`);
-
 			const work_dir = await sandbox.get_work_dir();
-			if (work_dir) {
-				console.log(`Working directory: ${work_dir}`);
+
+			if (args.json) {
+				console.log(JSON.stringify({
+					id: sandbox.id,
+					state: sandbox.state,
+					work_dir: work_dir || null,
+				}));
+			} else {
+				console.log('\nSandbox created successfully!');
+				console.log('ID: ' + sandbox.id);
+				console.log('State: ' + sandbox.state);
+				if (work_dir) {
+					console.log('Working directory: ' + work_dir);
+				}
 			}
 		} catch (error) {
 			if (is_missing_api_key_error(error)) {
-				console.error(`Error: ${error.message}`);
+				if (args.json) {
+					console.error(JSON.stringify({ error: error.message }));
+				} else {
+					console.error('Error: ' + error.message);
+				}
 				process.exit(1);
 			}
 			throw error;
