@@ -3,8 +3,10 @@
  * Wraps Daytona SDK for cloud sandbox execution
  */
 
-import { Daytona, Image } from '@daytonaio/sdk';
+import type { Daytona } from '@daytonaio/sdk';
+import { Image } from '@daytonaio/sdk';
 import { randomUUID } from 'crypto';
+import { create_daytona_client } from '../../sandbox/client.js';
 import type {
 	ExecuteOptions,
 	ExecuteResult,
@@ -34,7 +36,7 @@ export class DaytonaRuntime implements RuntimeEnvironment {
 
 	constructor(opts?: { on_build_log?: (chunk: string) => void }) {
 		this._id = `daytona-${randomUUID().slice(0, 8)}`;
-		this.daytona = new Daytona();
+		this.daytona = create_daytona_client();
 		this.on_build_log = opts?.on_build_log;
 	}
 

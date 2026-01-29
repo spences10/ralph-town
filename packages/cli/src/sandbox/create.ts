@@ -3,7 +3,8 @@
  * Factory function for creating Daytona sandboxes
  */
 
-import { Daytona, Image } from '@daytonaio/sdk';
+import { Image } from '@daytonaio/sdk';
+import { create_daytona_client } from './client.js';
 import { Sandbox } from './sandbox.js';
 import type { CreateSandboxOptions } from './types.js';
 
@@ -41,7 +42,7 @@ export function create_default_image(
 export async function create_sandbox(
 	options: CreateSandboxOptions = {},
 ): Promise<Sandbox> {
-	const daytona = new Daytona();
+	const daytona = create_daytona_client();
 
 	// Determine the image to use
 	let image: string | Image;

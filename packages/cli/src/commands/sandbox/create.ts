@@ -4,7 +4,10 @@
  */
 
 import { defineCommand } from 'citty';
-import { create_sandbox } from '../../sandbox/index.js';
+import {
+	create_sandbox,
+	is_missing_api_key_error,
+} from '../../sandbox/index.js';
 
 export default defineCommand({
 	meta: {
@@ -37,21 +40,29 @@ export default defineCommand({
 
 		console.log('Creating sandbox...');
 
-		const sandbox = await create_sandbox({
-			image: args.image,
-			auto_stop_interval: auto_stop,
-			timeout,
-			labels: args.name ? { name: args.name } : undefined,
-			on_build_log: (chunk) => process.stdout.write(chunk),
-		});
+		try {
+			const sandbox = await create_sandbox({
+				image: args.image,
+				auto_stop_interval: auto_stop,
+				timeout,
+				labels: args.name ? { name: args.name } : undefined,
+				on_build_log: (chunk) => process.stdout.write(chunk),
+			});
 
-		console.log(`\nSandbox created successfully!`);
-		console.log(`ID: ${sandbox.id}`);
-		console.log(`State: ${sandbox.state}`);
+			console.log(`\nSandbox created successfully!`);
+			console.log(`ID: ${sandbox.id}`);
+			console.log(`State: ${sandbox.state}`);
 
-		const work_dir = await sandbox.get_work_dir();
-		if (work_dir) {
-			console.log(`Working directory: ${work_dir}`);
+			const work_dir = await sandbox.get_work_dir();
+			if (work_dir) {
+				console.log(`Working directory: ${work_dir}`);
+			}
+		} catch (error) {
+			if (is_missing_api_key_error(error)) {
+				console.error(`Error: ${error.message}`);
+				process.exit(1);
+			}
+			throw error;
 		}
 	},
 });

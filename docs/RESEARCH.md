@@ -157,7 +157,7 @@ The MCP server exposes these tools for Claude Code:
 
 ## Sandbox Resources
 
-Default sandbox specs (Daytona tier dependent):
+Default sandbox specs:
 
 - **CPU**: 1 core
 - **Memory**: 1 GB

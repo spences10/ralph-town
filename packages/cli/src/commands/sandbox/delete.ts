@@ -4,7 +4,10 @@
  */
 
 import { defineCommand } from 'citty';
-import { Daytona } from '@daytonaio/sdk';
+import {
+	create_daytona_client,
+	is_missing_api_key_error,
+} from '../../sandbox/index.js';
 
 export default defineCommand({
 	meta: {
@@ -23,7 +26,16 @@ export default defineCommand({
 		},
 	},
 	async run({ args }) {
-		const daytona = new Daytona();
+		let daytona;
+		try {
+			daytona = create_daytona_client();
+		} catch (error) {
+			if (is_missing_api_key_error(error)) {
+				console.error(`Error: ${error.message}`);
+				process.exit(1);
+			}
+			throw error;
+		}
 		const sandbox = await daytona.get(args.id);
 		const timeout = args.timeout ? parseInt(args.timeout, 10) : 60;
 
