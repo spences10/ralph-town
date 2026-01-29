@@ -1,6 +1,6 @@
 /**
  * Runtime abstraction types
- * Enables orchestrator to work with Daytona, local, or devcontainer
+ * Enables working with Daytona, local, or devcontainer environments
  */
 
 export interface ExecuteOptions {
