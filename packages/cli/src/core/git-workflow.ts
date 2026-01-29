@@ -3,13 +3,38 @@
  * Handles repository setup, commits, and PR creation
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import type { RuntimeEnvironment } from './runtime/types.js';
 import type { GitConfig, RepositoryConfig } from './types.js';
 import { GREEN, RESET, print_error, print_message } from './utils.js';
 
-const exec_async = promisify(exec);
+/**
+ * Execute command with array args (safe from injection)
+ */
+function spawn_async(
+	cmd: string,
+	args: string[],
+): Promise<{ stdout: string; stderr: string; exit_code: number }> {
+	return new Promise((resolve) => {
+		const proc = spawn(cmd, args, { timeout: 120000 });
+		let stdout = '';
+		let stderr = '';
+
+		proc.stdout?.on('data', (data) => {
+			stdout += data.toString();
+		});
+		proc.stderr?.on('data', (data) => {
+			stderr += data.toString();
+		});
+
+		proc.on('close', (code) => {
+			resolve({ stdout, stderr, exit_code: code ?? 0 });
+		});
+		proc.on('error', (err) => {
+			resolve({ stdout, stderr: err.message, exit_code: 1 });
+		});
+	});
+}
 
 /**
  * Set up git repository in runtime
@@ -44,7 +69,12 @@ export async function setup_git(
 	const author = git.commit_author || 'Ralph Agent';
 	const email = git.commit_email || 'ralph@example.com';
 	await runtime.execute(
-		`cd ${repo_path} && git config user.name "${author}" && git config user.email "${email}"`,
+		'git config user.name ' + JSON.stringify(author),
+		{ cwd: repo_path },
+	);
+	await runtime.execute(
+		'git config user.email ' + JSON.stringify(email),
+		{ cwd: repo_path },
 	);
 
 	// Pre-install deps if package.json exists
@@ -186,10 +216,22 @@ export async function create_pull_request(
 	print_message('system', `Creating PR: ${title}`);
 
 	try {
-		const { stdout } = await exec_async(
-			`gh pr create --repo "${repo_path}" --head "${git.feature_branch}" --title "${title}" --body "${body.replace(/"/g, '\\"')}"`,
-		);
-		const pr_url = stdout.trim();
+		const result = await spawn_async('gh', [
+			'pr',
+			'create',
+			'--repo',
+			repo_path,
+			'--head',
+			git.feature_branch,
+			'--title',
+			title,
+			'--body',
+			body,
+		]);
+		if (result.exit_code !== 0) {
+			throw new Error(result.stderr || 'gh pr create failed');
+		}
+		const pr_url = result.stdout.trim();
 		print_message('system', `${GREEN}PR created: ${pr_url}${RESET}`);
 		return pr_url;
 	} catch (error) {

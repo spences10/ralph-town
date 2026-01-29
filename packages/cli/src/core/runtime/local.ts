@@ -3,7 +3,7 @@
  * Executes commands directly on the host via child_process
  */
 
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFile, writeFile, access, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -18,6 +18,44 @@ import type {
 } from './types.js';
 
 const exec_async = promisify(exec);
+
+/**
+ * Execute command with array args (safe from injection)
+ */
+function spawn_async(
+	cmd: string,
+	args: string[],
+	opts?: {
+		cwd?: string;
+		env?: Record<string, string>;
+		timeout?: number;
+	},
+): Promise<ExecuteResult> {
+	return new Promise((resolve) => {
+		const proc = spawn(cmd, args, {
+			cwd: opts?.cwd,
+			env: { ...process.env, ...opts?.env },
+			timeout: opts?.timeout || 120000,
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		proc.stdout?.on('data', (data) => {
+			stdout += data.toString();
+		});
+		proc.stderr?.on('data', (data) => {
+			stderr += data.toString();
+		});
+
+		proc.on('close', (code) => {
+			resolve({ stdout, stderr, exit_code: code ?? 0 });
+		});
+		proc.on('error', (err) => {
+			resolve({ stdout, stderr: err.message, exit_code: 1 });
+		});
+	});
+}
 
 export class LocalRuntime implements RuntimeEnvironment {
 	readonly type = 'local' as const;
@@ -113,31 +151,45 @@ export class LocalRuntime implements RuntimeEnvironment {
 					`https://git:${token}@github.com`,
 				);
 			}
-			const branch_flag = branch ? `-b ${branch}` : '';
-			await this.execute(`git clone ${branch_flag} ${auth_url} ${path}`);
+			const args = ['clone'];
+			if (branch) args.push('-b', branch);
+			args.push(auth_url, path);
+			await spawn_async('git', args, { cwd: this.workspace });
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
-			const flag = create ? '-b' : '';
-			await this.execute(`git checkout ${flag} ${branch}`);
+			const args = ['checkout'];
+			if (create) args.push('-b');
+			args.push(branch);
+			await spawn_async('git', args, { cwd: this.workspace });
 		},
 
 		add: async (files: string[]) => {
-			await this.execute(`git add ${files.join(' ')}`);
+			await spawn_async('git', ['add', ...files], {
+				cwd: this.workspace,
+			});
 		},
 
 		commit: async (message: string, author?: string, email?: string) => {
-			if (author && email) {
-				await this.execute(
-					`git -c user.name="${author}" -c user.email="${email}" commit -m "${message}"`,
-				);
-			} else {
-				await this.execute(`git commit -m "${message}"`);
-			}
+			const args =
+				author && email
+					? [
+							'-c',
+							`user.name=${author}`,
+							'-c',
+							`user.email=${email}`,
+							'commit',
+							'-m',
+							message,
+						]
+					: ['commit', '-m', message];
+			await spawn_async('git', args, { cwd: this.workspace });
 		},
 
 		push: async (branch: string, _token?: string) => {
-			await this.execute(`git push -u origin ${branch}`);
+			await spawn_async('git', ['push', '-u', 'origin', branch], {
+				cwd: this.workspace,
+			});
 		},
 
 		status: async (): Promise<GitStatus> => {
@@ -161,14 +213,20 @@ export class LocalRuntime implements RuntimeEnvironment {
 
 		create_worktree: async (branch: string): Promise<string> => {
 			const worktree_path = `${this.workspace}/.worktrees/${branch}`;
-			await this.execute(
-				`git worktree add "${worktree_path}" -b "${branch}"`,
+			await spawn_async(
+				'git',
+				['worktree', 'add', worktree_path, '-b', branch],
+				{ cwd: this.workspace },
 			);
 			return worktree_path;
 		},
 
 		remove_worktree: async (path: string): Promise<void> => {
-			await this.execute(`git worktree remove "${path}" --force`);
+			await spawn_async(
+				'git',
+				['worktree', 'remove', path, '--force'],
+				{ cwd: this.workspace },
+			);
 		},
 	};
 }

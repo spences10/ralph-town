@@ -7,7 +7,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, readFile, access, mkdir } from 'fs/promises';
 import { randomUUID } from 'crypto';
-import { join } from 'path';
+import { quote } from 'shell-quote';
 import type {
 	RuntimeEnvironment,
 	ExecuteOptions,
@@ -229,33 +229,44 @@ DOCKERFILE`,
 					`https://git:${token}@github.com`,
 				);
 			}
-			const branch_flag = branch ? `-b ${branch}` : '';
-			await this.execute(`git clone ${branch_flag} "${auth_url}" "${path}"`);
+			const args = ['git', 'clone'];
+			if (branch) args.push('-b', branch);
+			args.push(auth_url, path);
+			await this.execute(quote(args));
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
-			const flag = create ? '-b' : '';
-			await this.execute(`git checkout ${flag} "${branch}"`);
+			const args = ['git', 'checkout'];
+			if (create) args.push('-b');
+			args.push(branch);
+			await this.execute(quote(args));
 		},
 
 		add: async (files: string[]) => {
-			const file_list = files.map((f) => `"${f}"`).join(' ');
-			await this.execute(`git add ${file_list}`);
+			await this.execute(quote(['git', 'add', ...files]));
 		},
 
 		commit: async (message: string, author?: string, email?: string) => {
-			const escaped_msg = message.replace(/"/g, '\\"');
-			if (author && email) {
-				await this.execute(
-					`git -c user.name="${author}" -c user.email="${email}" commit -m "${escaped_msg}"`,
-				);
-			} else {
-				await this.execute(`git commit -m "${escaped_msg}"`);
-			}
+			const args =
+				author && email
+					? [
+							'git',
+							'-c',
+							`user.name=${author}`,
+							'-c',
+							`user.email=${email}`,
+							'commit',
+							'-m',
+							message,
+						]
+					: ['git', 'commit', '-m', message];
+			await this.execute(quote(args));
 		},
 
 		push: async (branch: string, _token?: string) => {
-			await this.execute(`git push -u origin "${branch}"`);
+			await this.execute(
+				quote(['git', 'push', '-u', 'origin', branch]),
+			);
 		},
 
 		status: async (): Promise<GitStatus> => {
@@ -281,15 +292,26 @@ DOCKERFILE`,
 		},
 
 		create_worktree: async (branch: string): Promise<string> => {
-			const worktree_path = `${this.workspace}/.worktrees/${branch}`;
+			const worktrees_dir = `${this.workspace}/.worktrees`;
+			const worktree_path = `${worktrees_dir}/${branch}`;
+			await this.execute(quote(['mkdir', '-p', worktrees_dir]));
 			await this.execute(
-				`mkdir -p "${this.workspace}/.worktrees" && git worktree add "${worktree_path}" -b "${branch}"`,
+				quote([
+					'git',
+					'worktree',
+					'add',
+					worktree_path,
+					'-b',
+					branch,
+				]),
 			);
 			return worktree_path;
 		},
 
 		remove_worktree: async (path: string): Promise<void> => {
-			await this.execute(`git worktree remove "${path}" --force`);
+			await this.execute(
+				quote(['git', 'worktree', 'remove', path, '--force']),
+			);
 		},
 	};
 }
