@@ -7,6 +7,7 @@ import {
 	sandbox_delete_tool,
 	sandbox_exec_tool,
 } from './tools/index.js';
+import pkg from '../package.json' with { type: 'json' };
 
 export function create_server() {
 	const adapter = new ValibotJsonSchemaAdapter();
@@ -14,7 +15,7 @@ export function create_server() {
 	const server = new McpServer(
 		{
 			name: 'mcp-ralph-town',
-			version: '0.0.1',
+			version: pkg.version,
 			description:
 				'MCP server for Daytona sandbox management',
 		},
