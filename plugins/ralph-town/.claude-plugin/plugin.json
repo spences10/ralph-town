@@ -1,6 +1,6 @@
 {
 	"name": "ralph-town",
-	"description": "Ralph Loop - autonomous agent orchestration with acceptance criteria iteration",
+	"description": "Daytona sandbox CLI for Claude Code teams",
 	"version": "0.0.1",
 	"author": {
 		"name": "Scott Spence",
@@ -12,7 +12,7 @@
 	"keywords": [
 		"agent",
 		"orchestration",
-		"ralph-loop",
+		"sandbox",
 		"automation",
 		"claude",
 		"daytona"
