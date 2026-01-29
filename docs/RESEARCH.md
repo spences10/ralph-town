@@ -117,11 +117,78 @@ ralph-town sandbox delete <id>
 
 ---
 
+## Credential Workflow for Teammates
+
+Teammates in sandboxes need credentials to push code and create PRs.
+Here's how to set it up.
+
+### Passing Credentials at Sandbox Creation
+
+Use `--env` to inject environment variables:
+
+```bash
+# Pass GH_TOKEN for git push/PR workflow
+ralph-town sandbox create \
+  --snapshot ralph-town-dev \
+  --env "GH_TOKEN=$GH_TOKEN"
+```
+
+The token is then available inside the sandbox as `$GH_TOKEN`.
+
+### Teammate Git Workflow
+
+Inside the sandbox, teammates use the token for authenticated git:
+
+```bash
+# Clone with token (no interactive auth needed)
+git clone https://$GH_TOKEN@github.com/user/repo.git
+
+# Or set remote with token
+git remote set-url origin https://$GH_TOKEN@github.com/user/repo.git
+
+# Push works without prompts
+git push -u origin feature-branch
+```
+
+### Creating PRs from Sandbox
+
+The snapshot includes `gh` CLI. Authenticate and create PRs:
+
+```bash
+# Auth with token
+echo $GH_TOKEN | gh auth login --with-token
+
+# Create PR
+gh pr create --title "Feature X" --body "Description"
+```
+
+### Security Considerations
+
+1. **Never bake tokens into snapshots** - Pass at runtime via `--env`
+2. **Tokens visible in sandbox** - Only pass what teammates need
+3. **Use scoped tokens** - Minimum permissions (repo access only)
+4. **Sandboxes are ephemeral** - Tokens gone when sandbox deleted
+
+### Known Issues & Workarounds
+
+| Issue | Workaround |
+|-------|------------|
+| `sandbox exec` returns -1 on snapshot sandboxes | Use SSH instead |
+| SSH PATH broken (commands not found) | Use full paths: `/usr/bin/git` OR rebuild snapshot with PR #41 |
+| `gh` CLI missing | Install via apt OR rebuild snapshot with PR #44 |
+
+### Future Improvements
+
+- **#38**: `--env-file .env` support for easier secret passing
+- **#39**: `sandbox env set <id> KEY=VALUE` for running sandboxes
+
+---
+
 ## Workflow Example
 
 ```bash
 # Team lead creates sandbox for teammate
-ralph-town sandbox create --name feature-work
+ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 # => Sandbox ID: abc123
 
 # Get SSH access
@@ -130,12 +197,13 @@ ralph-town sandbox ssh abc123
 
 # Teammate SSHs in and works
 ssh xyz789@ssh.app.daytona.io
-> git clone https://github.com/user/repo.git
+> git clone https://$GH_TOKEN@github.com/user/repo.git
 > cd repo
 > git checkout -b feature/new-thing
 > # ... make changes ...
 > git commit -m "Add new feature"
 > git push -u origin feature/new-thing
+> gh pr create --title "Add feature" --body "Details"
 
 # Cleanup when done
 ralph-town sandbox delete abc123
