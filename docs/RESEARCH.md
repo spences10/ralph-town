@@ -1,196 +1,179 @@
-# Ralph-Town Research
+# Daytona Sandbox Research
 
-Research index for the Ralph Loop + Gas Town orchestration patterns.
-
----
-
-## Project Vision
-
-**Goal**: Use Daytona containers to run an orchestrator that spawns
-child agents, iterating until acceptance criteria are met (Ralph Loop)
-with resource budgeting (Gas Town).
-
-**Target users**: Development team working on epics/tickets who want
-autonomous agent assistance.
+Research notes and findings from exploring Daytona SDK integration
+for Claude Code teams.
 
 ---
 
-## Validation Status
+## Problem Statement
 
-**Core loop validated!** The basic Ralph Loop works:
+When Claude Code spawns teammates (via the Task tool), all agents
+share the same filesystem. This creates problems:
 
-```
-ralph.json → Orchestrator → Daytona Sandbox → Agent → Criteria Check → Success
-```
+- **Collisions** - Two agents editing the same file conflict
+- **No isolation** - One agent's changes affect others
+- **Risk** - Experimental code runs on user's actual codebase
+- **No parallel branches** - Can't work on multiple features
+  simultaneously
 
-See `ralph-town run` to execute.
-
----
-
-## Research Areas
-
-| Area                 | Doc                                                         | Status        |
-| -------------------- | ----------------------------------------------------------- | ------------- |
-| Architecture         | [architecture.md](research/architecture.md)                 | **Validated** |
-| Daytona SDK          | [daytona-sdk.md](research/daytona-sdk.md)                   | **Validated** |
-| Cost Projections     | [cost-projections.md](research/cost-projections.md)         | **Validated** |
-| Claude Agent SDK     | [claude-agent-sdk.md](research/claude-agent-sdk.md)         | In progress   |
-| Ralph Loop           | [ralph-loop.md](research/ralph-loop.md)                     | **Validated** |
-| Gas Town             | [gas-town.md](research/gas-town.md)                         | In progress   |
-| Developer Experience | [developer-experience.md](research/developer-experience.md) | In progress   |
-| Testing              | [testing.md](research/testing.md)                           | In progress   |
-| Telemetry            | [telemetry.md](research/telemetry.md)                       | In progress   |
-| Git Workflow         | [git-workflow.md](research/git-workflow.md)                 | In progress   |
-| Skills Planning      | [skills-planning.md](research/skills-planning.md)           | In progress   |
-| Runtime Abstraction  | [runtime-abstraction.md](research/runtime-abstraction.md)   | Design draft  |
+**Solution**: Give each teammate their own Daytona sandbox.
 
 ---
 
-## Answered Questions
+## Key Findings
 
-1. **Can orchestrator run entirely in Daytona?** Not on preview tier.
-   Option A (local orchestrator) works now. Option B possible on Tier
-   3+.
+### 1. Sandbox Creation Times
 
-2. **What's the ralph.json acceptance criteria schema?** Validated:
-   `file_exists` and `command_succeeds` types work. See
-   `src/types.ts`.
+Tested with pre-baked Node.js image:
 
-3. **How to handle long-running tasks vs sandbox timeouts?** 120s
-   timeout per command execution. Configurable.
+| Sandbox | Time | Notes |
+|---------|------|-------|
+| First | ~18s | Builds/caches image |
+| Second | **~1.3s** | Uses cached image |
+| Third | **~1.3s** | Cached |
 
-4. **Does Claude Agent SDK require special API access?** No. Standard
-   `ANTHROPIC_API_KEY` works. Also supports Bedrock/Vertex/Foundry.
+**Conclusion**: 14x speedup after first run. Cached sandboxes are fast
+enough for practical use.
 
----
+### 2. SSH Access Works
 
-## Open Questions
-
-1. How to share state between sibling sandboxes efficiently?
-2. Token/cost tracking granularity - per message? per task?
-3. ~~How does the original Ralph Wiggum loop work exactly?~~
-   **Answered** - see `docs/ralph-pocock/`
-4. What existing multi-agent patterns can we learn from?
-5. MCP server vs other interface options?
-6. Credential management for team usage?
-7. Runtime abstraction: clone fresh or assume pre-cloned for local?
-8. Worktree cleanup strategy after parallel runs?
-9. Test Ralph-style prompting with devcontainer and local runtimes
-
----
-
-## Snapshot Support (Tier 3+)
-
-**Snapshots now working!** Pre-built images enable instant sandbox
-creation with tools pre-installed.
-
-### Current Setup
-
-- Snapshot `ralph-town-dev` has Bun + Claude Agent SDK
-- Create with: `bun src/create-snapshot.ts`
-- Sandboxes spin up in ~3s instead of ~30s
-
-### How Snapshots Work
-
-Daytona snapshots are pre-built images (like Dockerfiles), NOT live VM
-checkpoints. You define the image declaratively, Daytona builds it
-once, then spawns sandboxes from it instantly.
+Daytona provides token-based SSH access:
 
 ```typescript
-// Create sandbox from snapshot
-const sandbox = await daytona.create({
-	snapshot: 'ralph-town-dev',
-	language: 'typescript',
-});
+const ssh_access = await sandbox.createSshAccess(60); // 60 min expiry
+// Returns: { token, command, expires_at }
+// Connect with: ssh <token>@ssh.app.daytona.io
 ```
 
-See `.claude/skills/daytona-sdk/SKILL.md` for full API details.
+**Tested and verified** - Full shell access, can run any command.
+
+### 3. Pre-baked Images
+
+Default image includes:
+- `node:22-slim` base
+- `git`, `curl` installed
+- `typescript`, `tsx` globally installed
+
+Custom images can add more tools via dockerfile commands.
+
+### 4. SDK Capabilities
+
+The `@daytonaio/sdk` provides:
+
+- `sandbox.process.executeCommand()` - Run commands
+- `sandbox.fs.uploadFile()` / `downloadFile()` - File operations
+- `sandbox.git.*` - Clone, branch, commit, push
+- `sandbox.createSshAccess()` - Get SSH credentials
+- `sandbox.delete()` - Cleanup
 
 ---
 
-## Ralph-Style Agent Prompting
+## Architecture
 
-**Validated approach** for getting agents to make actual changes:
+### Claude Code Team + Daytona Sandboxes
 
-### Problem
+```
+Claude Code Team Lead (local)
+├── Creates sandbox (1.3s with cached image)
+├── Gets SSH credentials
+│
+├── Teammate A ──SSH──> Sandbox A ──> feature-branch-a
+├── Teammate B ──SSH──> Sandbox B ──> feature-branch-b
+└── Teammate C ──SSH──> Sandbox C ──> feature-branch-c
 
-Initial agent prompts were too minimal. Haiku agents would:
+Each teammate works in complete isolation.
+Push branches, create PRs when done.
+Delete sandboxes to clean up.
+```
 
-- Skip exploration, dive straight into coding
-- Not run feedback loops (build/typecheck)
-- Leave code in broken state
-- Not report progress
+### Why This Architecture?
 
-### Solution: Structured Prompt
-
-Agent system prompt now follows Ralph methodology:
-
-1. **EXPLORATION** - Explore codebase before coding
-   - `ls -la`, read package.json, find config files
-   - Understand existing patterns first
-
-2. **EXECUTION** - Make smallest possible change
-   - One task per execution
-   - If task too big, break it down
-
-3. **FEEDBACK LOOPS** - Mandatory before finishing
-   - Run `pnpm run build` / `pnpm run check`
-   - Fix any errors before declaring done
-
-4. **PROGRESS REPORT** - Structured output
-   ```
-   DONE: [what completed]
-   FILES: [files changed]
-   VERIFIED: [feedback commands passed]
-   NEXT: [remaining work]
-   BLOCKERS: [issues]
-   ```
-
-### Progress Tracking
-
-- `progress.txt` created in working directory
-- Appended after each iteration
-- Passed to agent as context for continuity
-- Included in PRs for visibility
-
-### Task Format
-
-Enhanced task prompt includes:
-
-- Task description + steps
-- Backpressure command to pass
-- Feedback commands to run
-- Previous failure context
-- Recent progress history
-
-See `packages/cli/src/core/sandbox-agent.ts` and
-`packages/cli/src/core/orchestrator.ts`.
+1. **Isolation** - Each sandbox is independent
+2. **Parallel work** - Multiple features simultaneously
+3. **Safety** - Experiments don't touch real code
+4. **Disposable** - Failed attempts just get deleted
+5. **Full environment** - Not just command execution, real shell
 
 ---
 
-## TODO: Test Other Runtimes
+## CLI Commands
 
-The Ralph-style prompting works with Daytona. Need to validate:
+```bash
+# Create a sandbox
+ralph-town sandbox create [--name NAME]
 
-- [ ] **devcontainer** runtime - Does progress.txt work?
-- [ ] **local** runtime - Git worktree + progress tracking?
-- [ ] Performance comparison across runtimes
-- [ ] Snapshot equivalent for devcontainer?
+# Get SSH credentials
+ralph-town sandbox ssh <id> [--expires MINUTES]
+
+# List active sandboxes
+ralph-town sandbox list [--json]
+
+# Execute command in sandbox
+ralph-town sandbox exec <id> <command>
+
+# Delete sandbox
+ralph-town sandbox delete <id>
+```
+
+---
+
+## Workflow Example
+
+```bash
+# Team lead creates sandbox for teammate
+ralph-town sandbox create --name feature-work
+# => Sandbox ID: abc123
+
+# Get SSH access
+ralph-town sandbox ssh abc123
+# => ssh xyz789@ssh.app.daytona.io
+
+# Teammate SSHs in and works
+ssh xyz789@ssh.app.daytona.io
+> git clone https://github.com/user/repo.git
+> cd repo
+> git checkout -b feature/new-thing
+> # ... make changes ...
+> git commit -m "Add new feature"
+> git push -u origin feature/new-thing
+
+# Cleanup when done
+ralph-town sandbox delete abc123
+```
+
+---
+
+## MCP Tools
+
+The MCP server exposes these tools for Claude Code:
+
+- `sandbox_create` - Create sandbox, returns ID
+- `sandbox_ssh` - Get SSH credentials
+- `sandbox_list` - List active sandboxes
+- `sandbox_exec` - Run command in sandbox
+- `sandbox_delete` - Delete sandbox
+
+---
+
+## Sandbox Resources
+
+Default sandbox specs (Daytona tier dependent):
+
+- **CPU**: 1 core
+- **Memory**: 1 GB
+- **Disk**: 3 GB
+- **Auto-stop**: 15 minutes idle
+- **Auto-archive**: 7 days
 
 ---
 
 ## References
 
 ### External
-
-- [Claude Agent SDK TS](https://github.com/anthropics/claude-agent-sdk-typescript)
-- [Daytona SDK](https://github.com/daytonaio/daytona) (monorepo)
+- [Daytona SDK](https://github.com/daytonaio/daytona)
 - [Daytona Docs](https://www.daytona.io/docs)
 
 ### Internal
-
-- `packages/cli/src/core/orchestrator.ts` - Main Ralph Loop
-  implementation
-- `packages/cli/src/core/sandbox-agent.ts` - Developer agent running
-  in sandbox
-- `packages/cli/src/core/types.ts` - Type definitions for ralph.json
+- `packages/cli/src/sandbox/` - Sandbox module
+- `packages/cli/src/commands/sandbox/` - CLI commands
+- `packages/mcp-ralph-town/src/tools/sandbox.ts` - MCP tools

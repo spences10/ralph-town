@@ -1,146 +1,109 @@
 # ralph-town
 
-CLI for autonomous agent orchestration using Claude Agent SDK.
+Daytona sandbox management for Claude Code teams.
 
-**Ralph Loop**: Iterate until acceptance criteria are met. **Gas
-Town**: Resource budgeting (tokens, cost, time).
+## Why?
+
+When Claude Code spawns teammates, they all share the same filesystem.
+This causes problems:
+
+- Two agents editing the same file conflict
+- Experimental code runs on your actual codebase
+- Can't work on multiple features in parallel
+
+**Solution**: Give each teammate their own isolated Daytona sandbox.
+
+## How It Works
+
+```
+Claude Code Team Lead (local)
+├── Creates sandbox (~1.3s with cached image)
+├── Gets SSH credentials for teammate
+│
+├── Teammate A ──SSH──> Sandbox A ──> feature-branch-a
+├── Teammate B ──SSH──> Sandbox B ──> feature-branch-b
+└── Teammate C ──SSH──> Sandbox C ──> feature-branch-c
+```
+
+Each teammate works in complete isolation. Push branches, create PRs,
+delete sandboxes when done.
 
 ## Install
 
 ```bash
 npm install -g ralph-town
-# or
-npx ralph-town
 ```
 
-## Quick Start
+## CLI Commands
 
 ```bash
-# Initialize config in your project
-ralph-town init
+# Create a sandbox
+ralph-town sandbox create [--name NAME]
 
-# Edit ralph.json with your task and repo
+# Get SSH credentials
+ralph-town sandbox ssh <id>
 
-# Run the loop
-ralph-town run
+# List active sandboxes
+ralph-town sandbox list
+
+# Execute command in sandbox
+ralph-town sandbox exec <id> <command>
+
+# Delete sandbox
+ralph-town sandbox delete <id>
 ```
 
-## How it Works
-
-```
-ralph.json → Orchestrator → Sandbox → Agent → Backpressure Check → Loop/Done → PR
-```
-
-1. Reads `ralph.json` with acceptance criteria
-2. Spins up sandbox (Daytona, local, or devcontainer)
-3. Clones target repo, creates feature branch
-4. For each criterion:
-   - Runs agent with the task steps
-   - Checks backpressure (build, tests, etc.)
-   - Retries on failure, moves on when passing
-5. Commits, pushes, creates PR
-
-## Commands
+## Example Workflow
 
 ```bash
-ralph-town init      # Create ralph.json template
-ralph-town validate  # Validate config
-ralph-town run       # Execute the loop
-ralph-town run --runtime local      # Use local runtime
-ralph-town run --runtime daytona    # Use Daytona sandbox
-ralph-town run --dry-run            # Validate without executing
+# Create sandbox for teammate
+ralph-town sandbox create --name feature-work
+# => Sandbox ID: abc123
+
+# Get SSH access
+ralph-town sandbox ssh abc123
+# => ssh xyz789@ssh.app.daytona.io
+
+# Teammate SSHs in and works
+ssh xyz789@ssh.app.daytona.io
+$ git clone https://github.com/user/repo.git
+$ cd repo && git checkout -b feature/new-thing
+$ # ... make changes ...
+$ git push -u origin feature/new-thing
+
+# Cleanup
+ralph-town sandbox delete abc123
 ```
 
-## Configuration
+## Performance
 
-### ralph.json
+| Operation | Time |
+|-----------|------|
+| First sandbox (builds image) | ~18s |
+| Subsequent sandboxes (cached) | ~1.3s |
 
-```json
-{
-	"repository": {
-		"url": "https://github.com/user/repo.git",
-		"branch": "main"
-	},
-	"git": {
-		"feature_branch": "feature/my-changes",
-		"create_pr": true
-	},
-	"execution": {
-		"mode": "sequential",
-		"model": "haiku"
-	},
-	"acceptance_criteria": [
-		{
-			"id": "ac-001",
-			"description": "Add health endpoint",
-			"steps": [
-				"Create src/routes/api/health/+server.ts",
-				"Export GET handler returning json({ status: 'ok' })"
-			],
-			"backpressure": "pnpm run build",
-			"passes": false
-		}
-	],
-	"max_iterations_per_criterion": 3
-}
-```
+14x speedup after first run.
 
-### Execution Modes
+## Requirements
 
-| Mode         | Description                 | PRs Created        |
-| ------------ | --------------------------- | ------------------ |
-| `sequential` | Criteria run in order       | 1 combined PR      |
-| `parallel`   | Criteria run simultaneously | 1 PR per criterion |
+- `DAYTONA_API_KEY` - Get from [daytona.io](https://daytona.io)
+- `GITHUB_PAT` - For git push operations (optional)
 
-### Runtimes
+## Packages
 
-| Runtime        | Description            | Requirements         |
-| -------------- | ---------------------- | -------------------- |
-| `local`        | Direct shell execution | None                 |
-| `daytona`      | Cloud sandbox          | `DAYTONA_API_KEY`    |
-| `devcontainer` | Docker container       | Running devcontainer |
+| Package | Description |
+|---------|-------------|
+| `packages/cli` | Main CLI tool |
+| `packages/mcp-ralph-town` | MCP server for Claude Code |
 
-### Model Selection
-
-| Model    | Best For          | Cost     |
-| -------- | ----------------- | -------- |
-| `haiku`  | Well-scoped tasks | Default  |
-| `sonnet` | Complex tasks     | ~5x more |
-| `opus`   | Most challenging  | Premium  |
-
-### Environment Variables
-
-| Variable              | Required        | Description     |
-| --------------------- | --------------- | --------------- |
-| `ANTHROPIC_API_KEY`   | Yes             | Claude API key  |
-| `DAYTONA_API_KEY`     | runtime=daytona | Daytona API key |
-| `GITHUB_PAT`          | git workflow    | GitHub token    |
-| `LANGFUSE_PUBLIC_KEY` | No              | Telemetry       |
-| `LANGFUSE_SECRET_KEY` | No              | Telemetry       |
-
-## Acceptance Criteria Format
-
-| Field          | Description                        |
-| -------------- | ---------------------------------- |
-| `id`           | Unique identifier (e.g., `ac-001`) |
-| `description`  | What this criterion achieves       |
-| `steps`        | Implementation steps for agent     |
-| `backpressure` | Command to verify (exit 0 = pass)  |
-| `passes`       | Set to true when passing           |
-
-### Backpressure Patterns
+## Development
 
 ```bash
-# Build passes
-pnpm run build
-
-# File exists
-test -f src/lib/MyComponent.svelte
-
-# Combined checks
-test -f src/lib/theme.ts && pnpm run build
+bun dev          # Development mode
+bun run build    # Compile TypeScript
 ```
 
 ## Research
 
-See `docs/RESEARCH.md` for architecture and design decisions.
+See [docs/RESEARCH.md](docs/RESEARCH.md) for architecture notes and
+findings from our exploration.
