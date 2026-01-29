@@ -15,6 +15,10 @@ export default defineCommand({
 		description: 'Create a new sandbox with pre-baked image',
 	},
 	args: {
+		snapshot: {
+			type: 'string',
+			description: 'Use pre-built snapshot (e.g., ralph-town-dev)',
+		},
 		image: {
 			type: 'string',
 			description: 'Base Docker image (default: node:22-slim)',
@@ -31,12 +35,27 @@ export default defineCommand({
 			type: 'string',
 			description: 'Creation timeout in seconds (default: 120)',
 		},
+		env: {
+			type: 'string',
+			description: 'Environment variables (KEY=VALUE, comma-separated or repeat flag)',
+		},
 		json: {
 			type: 'boolean',
 			description: 'Output as JSON',
 		},
 	},
 	async run({ args }) {
+		// Parse env vars from --env flag
+		const env_vars: Record<string, string> = {};
+		if (args.env) {
+			const parts = args.env.split(',');
+			for (const part of parts) {
+				const [key, ...valueParts] = part.trim().split('=');
+				if (key && valueParts.length > 0) {
+					env_vars[key] = valueParts.join('=');
+				}
+			}
+		}
 		const auto_stop = args['auto-stop']
 			? parseInt(args['auto-stop'], 10)
 			: undefined;
@@ -48,11 +67,13 @@ export default defineCommand({
 
 		try {
 			const sandbox = await create_sandbox({
+				snapshot: args.snapshot,
 				image: args.image,
 				auto_stop_interval: auto_stop,
 				timeout,
 				labels: args.name ? { name: args.name } : undefined,
-				on_build_log: args.json ? undefined : (chunk) => process.stdout.write(chunk),
+				env_vars: Object.keys(env_vars).length > 0 ? env_vars : undefined,
+				on_build_log: (args.json || args.snapshot) ? undefined : (chunk) => process.stdout.write(chunk),
 			});
 
 			const work_dir = await sandbox.get_work_dir();
