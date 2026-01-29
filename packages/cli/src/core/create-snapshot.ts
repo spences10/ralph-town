@@ -25,11 +25,16 @@ async function create_snapshot(): Promise<void> {
 		// Snapshot doesn't exist, continue
 	}
 
-	// Build image with Bun + Claude Agent SDK
+	// Build image with Bun + Claude Agent SDK + gh CLI
 	const image = Image.base('debian:bookworm-slim')
 		.runCommands(
 			// Install dependencies
 			'apt-get update && apt-get install -y curl unzip git ca-certificates',
+			// Install gh CLI for PR workflow
+			'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg',
+			'chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg',
+			'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null',
+			'apt-get update && apt-get install -y gh',
 			// Install Bun
 			'curl -fsSL https://bun.sh/install | bash',
 			// Create working directory
