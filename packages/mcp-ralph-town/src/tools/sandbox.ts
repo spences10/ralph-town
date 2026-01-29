@@ -70,10 +70,10 @@ export const sandbox_create_tool = defineTool(
 		if (name) {
 			args.push('--name', name);
 		}
-		if (auto_stop \!== undefined) {
+		if (auto_stop !== undefined) {
 			args.push('--auto-stop', String(auto_stop));
 		}
-		if (timeout \!== undefined) {
+		if (timeout !== undefined) {
 			args.push('--timeout', String(timeout));
 		}
 
@@ -109,7 +109,7 @@ export const sandbox_list_tool = defineTool(
 	async ({ limit }) => {
 		const args = ['sandbox', 'list', '--json'];
 
-		if (limit \!== undefined) {
+		if (limit !== undefined) {
 			args.push('--limit', String(limit));
 		}
 
@@ -146,7 +146,7 @@ export const sandbox_ssh_tool = defineTool(
 	async ({ id, expires }) => {
 		const args = ['sandbox', 'ssh', id, '--json'];
 
-		if (expires \!== undefined) {
+		if (expires !== undefined) {
 			args.push('--expires', String(expires));
 		}
 
@@ -183,7 +183,7 @@ export const sandbox_delete_tool = defineTool(
 	async ({ id, timeout }) => {
 		const args = ['sandbox', 'delete', id, '--json'];
 
-		if (timeout \!== undefined) {
+		if (timeout !== undefined) {
 			args.push('--timeout', String(timeout));
 		}
 
@@ -225,7 +225,7 @@ export const sandbox_exec_tool = defineTool(
 		if (cwd) {
 			args.push('--cwd', cwd);
 		}
-		if (timeout \!== undefined) {
+		if (timeout !== undefined) {
 			args.push('--timeout', String(timeout));
 		}
 
