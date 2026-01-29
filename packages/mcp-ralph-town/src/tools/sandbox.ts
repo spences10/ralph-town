@@ -3,23 +3,46 @@
  * Tools for managing Daytona sandboxes via the CLI
  */
 
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { defineTool } from 'tmcp/tool';
 import { tool } from 'tmcp/utils';
 import * as v from 'valibot';
 
 const cli_path = process.env.RALPH_TOWN_CLI_PATH || 'ralph-town';
+const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
+
+/** Track running processes for cleanup */
+const running_processes = new Set<ChildProcess>();
+
+/**
+ * Kill all running CLI processes (for graceful shutdown)
+ */
+export function kill_all_processes(): void {
+	for (const proc of running_processes) {
+		proc.kill('SIGTERM');
+	}
+	running_processes.clear();
+}
 
 /**
  * Execute CLI command and return result
  */
 function run_cli(
 	args: string[],
+	timeout_ms = DEFAULT_TIMEOUT_MS,
 ): Promise<{ stdout: string; stderr: string; exit_code: number }> {
 	return new Promise((resolve) => {
+		let timed_out = false;
+		const timeout_id = setTimeout(() => {
+			timed_out = true;
+			proc.kill('SIGTERM');
+		}, timeout_ms);
+
 		const proc = spawn(cli_path, args, {
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});
+
+		running_processes.add(proc);
 
 		let stdout = '';
 		let stderr = '';
@@ -33,10 +56,23 @@ function run_cli(
 		});
 
 		proc.on('close', (code) => {
-			resolve({ stdout, stderr, exit_code: code ?? 1 });
+			clearTimeout(timeout_id);
+			running_processes.delete(proc);
+
+			if (timed_out) {
+				resolve({
+					stdout: '',
+					stderr: `Command timed out after ${timeout_ms}ms`,
+					exit_code: 124,
+				});
+			} else {
+				resolve({ stdout, stderr, exit_code: code ?? 1 });
+			}
 		});
 
 		proc.on('error', (err) => {
+			clearTimeout(timeout_id);
+			running_processes.delete(proc);
 			resolve({
 				stdout: '',
 				stderr: err.message,
@@ -53,7 +89,7 @@ export const sandbox_create_tool = defineTool(
 	{
 		name: 'sandbox_create',
 		description:
-			'Create a new Daytona sandbox with pre-baked image (node:22-slim with git, typescript, tsx). Options: image (base Docker image), name (sandbox label), auto_stop (minutes, 0 to disable), timeout (seconds, default 120), snapshot (snapshot ID to create from), env (environment variables as KEY=value)',
+			'Create a new Daytona sandbox with pre-baked image (node:22-slim with git, typescript, tsx). Options: image (base Docker image), name (sandbox display name), auto_stop (minutes, 0 to disable), timeout (seconds, default 120), snapshot (snapshot ID to create from), env (environment variables as KEY=value)',
 		schema: v.object({
 			image: v.optional(v.pipe(v.string(), v.minLength(1))),
 			name: v.optional(v.pipe(v.string(), v.minLength(1))),
