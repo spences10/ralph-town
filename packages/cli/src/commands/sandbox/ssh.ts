@@ -48,11 +48,13 @@ export default defineCommand({
 
 		const access = await sandbox.createSshAccess(expires_minutes);
 
+		const masked_token = `****${access.token.slice(-4)}`;
+
 		if (args.json) {
 			console.log(
 				JSON.stringify(
 					{
-						token: access.token,
+						token: masked_token,
 						command: access.sshCommand,
 						expires_at: access.expiresAt,
 					},
@@ -62,7 +64,7 @@ export default defineCommand({
 			);
 		} else {
 			console.log(`SSH Command:\n${access.sshCommand}\n`);
-			console.log(`Token: ${access.token}`);
+			console.log(`Token: ${masked_token}`);
 			console.log(`Expires: ${access.expiresAt}`);
 		}
 	},
