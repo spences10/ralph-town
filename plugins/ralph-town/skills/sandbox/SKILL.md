@@ -41,3 +41,30 @@ ralph-town sandbox delete <id>
 3. Teammate makes changes, commits, pushes
 4. Teammate creates PR via gh CLI
 5. Delete sandbox when done
+
+## SSH Tips
+
+PATH is broken in SSH sessions. Use full paths:
+```bash
+ssh <token>@ssh.app.daytona.io "export PATH=/usr/bin:/bin:/root/.bun/bin:\$PATH && <command>"
+```
+
+Or prefix commands with `/usr/bin/` or `/bin/`.
+
+## Known Issues
+
+| Issue | Workaround |
+|-------|------------|
+| `exec` returns -1 | Use SSH instead (#31) |
+| `gh` not installed | `apt-get install -y gh` in sandbox (#32) |
+| PATH broken in SSH | Use full paths (#33) |
+| `--name` ignored | Use `--env` for labels (#34) |
+
+## First-Time Setup
+
+Create snapshot once (takes ~3 min):
+```bash
+bun run packages/cli/src/core/create-snapshot.ts
+```
+
+This installs Bun, TypeScript, and Claude Agent SDK.

@@ -35,6 +35,18 @@ const sandbox = await daytona.create({
 // Sandbox has Bun + Agent SDK ready instantly
 ```
 
+## ralph-town-dev Snapshot
+
+Pre-built snapshot with Bun, TypeScript, and Claude Agent SDK:
+
+```bash
+# Create snapshot (run once, ~3 min)
+bun run packages/cli/src/core/create-snapshot.ts
+
+# Use via CLI
+ralph-town sandbox create --snapshot ralph-town-dev
+```
+
 **Note:** Snapshots are pre-built images (like Dockerfiles), not live
 VM checkpoints. Define tooling upfront, build once, use many times.
 

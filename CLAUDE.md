@@ -8,21 +8,43 @@ teams to work in isolated environments.
 When you spawn teammates, they normally share your filesystem. This
 tool gives each teammate their own Daytona sandbox instead.
 
-## Using Sandboxes for Teammates
+## Teammate Sandbox Workflow
+
+### Prerequisites
+
+1. Create snapshot once (has Bun, TypeScript, Claude Agent SDK):
+   ```bash
+   bun run packages/cli/src/core/create-snapshot.ts
+   ```
+
+2. Set `GH_TOKEN` in `.env` (for teammates to push/PR)
+
+### Per-Teammate Flow
 
 ```bash
-# 1. Create sandbox for a teammate
-ralph-town sandbox create --name feature-work
+# 1. Create sandbox from snapshot with git token
+ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 # Returns sandbox ID
 
 # 2. Get SSH credentials
 ralph-town sandbox ssh <sandbox-id>
 # Returns: ssh <token>@ssh.app.daytona.io
 
-# 3. Teammate SSHs in and works in isolation
-# 4. Delete when done
+# 3. Teammate works in sandbox:
+#    - Clone repo with token: git clone https://$GH_TOKEN@github.com/...
+#    - Make changes, commit, push
+#    - Create PR via: gh pr create ...
+
+# 4. Delete sandbox when done
 ralph-town sandbox delete <sandbox-id>
 ```
+
+### Known Issues
+
+- `sandbox exec` returns -1 (use SSH instead) - #31
+- SSH PATH broken, use full paths: `/usr/bin/git` - #33
+- Snapshot missing `gh` CLI (install via apt in sandbox) - #32
+- `--name` flag doesn't set display name - #34
 
 ## Code Style
 
