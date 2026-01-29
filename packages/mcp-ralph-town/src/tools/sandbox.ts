@@ -8,6 +8,8 @@ import { defineTool } from 'tmcp/tool';
 import { tool } from 'tmcp/utils';
 import * as v from 'valibot';
 
+const cli_path = process.env.RALPH_TOWN_CLI_PATH || 'ralph-town';
+
 /**
  * Execute CLI command and return result
  */
@@ -15,9 +17,8 @@ function run_cli(
 	args: string[],
 ): Promise<{ stdout: string; stderr: string; exit_code: number }> {
 	return new Promise((resolve) => {
-		const proc = spawn('bun', ['ralph-town', ...args], {
+		const proc = spawn(cli_path, args, {
 			stdio: ['ignore', 'pipe', 'pipe'],
-			shell: true,
 		});
 
 		let stdout = '';
@@ -61,7 +62,7 @@ export const sandbox_create_tool = defineTool(
 		}),
 	},
 	async ({ image, name, auto_stop, timeout }) => {
-		const args = ['sandbox', 'create'];
+		const args = ['sandbox', 'create', '--json'];
 
 		if (image) {
 			args.push('--image', image);
@@ -69,17 +70,22 @@ export const sandbox_create_tool = defineTool(
 		if (name) {
 			args.push('--name', name);
 		}
-		if (auto_stop !== undefined) {
+		if (auto_stop \!== undefined) {
 			args.push('--auto-stop', String(auto_stop));
 		}
-		if (timeout !== undefined) {
+		if (timeout \!== undefined) {
 			args.push('--timeout', String(timeout));
 		}
 
 		const result = await run_cli(args);
 
 		if (result.exit_code === 0) {
-			return tool.text(result.stdout || 'Sandbox created successfully');
+			try {
+				const sandbox = JSON.parse(result.stdout);
+				return tool.text(JSON.stringify(sandbox, null, 2));
+			} catch {
+				return tool.text(result.stdout || 'Sandbox created successfully');
+			}
 		} else {
 			return tool.text(
 				`Failed to create sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
@@ -103,7 +109,7 @@ export const sandbox_list_tool = defineTool(
 	async ({ limit }) => {
 		const args = ['sandbox', 'list', '--json'];
 
-		if (limit !== undefined) {
+		if (limit \!== undefined) {
 			args.push('--limit', String(limit));
 		}
 
@@ -133,14 +139,14 @@ export const sandbox_ssh_tool = defineTool(
 		description:
 			'Get SSH command and token for connecting to a sandbox. Required: id (sandbox ID or name). Options: expires (token expiration in minutes, default 60)',
 		schema: v.object({
-			id: v.string(),
+			id: v.pipe(v.string(), v.minLength(1)),
 			expires: v.optional(v.number()),
 		}),
 	},
 	async ({ id, expires }) => {
 		const args = ['sandbox', 'ssh', id, '--json'];
 
-		if (expires !== undefined) {
+		if (expires \!== undefined) {
 			args.push('--expires', String(expires));
 		}
 
@@ -170,23 +176,26 @@ export const sandbox_delete_tool = defineTool(
 		description:
 			'Delete a Daytona sandbox. Required: id (sandbox ID or name). Options: timeout (deletion timeout in seconds, default 60)',
 		schema: v.object({
-			id: v.string(),
+			id: v.pipe(v.string(), v.minLength(1)),
 			timeout: v.optional(v.number()),
 		}),
 	},
 	async ({ id, timeout }) => {
-		const args = ['sandbox', 'delete', id];
+		const args = ['sandbox', 'delete', id, '--json'];
 
-		if (timeout !== undefined) {
+		if (timeout \!== undefined) {
 			args.push('--timeout', String(timeout));
 		}
 
 		const result = await run_cli(args);
 
 		if (result.exit_code === 0) {
-			return tool.text(
-				result.stdout || `Sandbox ${id} deleted successfully`,
-			);
+			try {
+				const delete_result = JSON.parse(result.stdout);
+				return tool.text(JSON.stringify(delete_result, null, 2));
+			} catch {
+				return tool.text(result.stdout || `Sandbox ${id} deleted successfully`);
+			}
 		} else {
 			return tool.text(
 				`Failed to delete sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
@@ -204,9 +213,9 @@ export const sandbox_exec_tool = defineTool(
 		description:
 			'Execute a command in a Daytona sandbox. Required: id (sandbox ID or name), cmd (command to execute). Options: cwd (working directory), timeout (command timeout in seconds, default 120)',
 		schema: v.object({
-			id: v.string(),
-			cmd: v.string(),
-			cwd: v.optional(v.string()),
+			id: v.pipe(v.string(), v.minLength(1)),
+			cmd: v.pipe(v.string(), v.minLength(1)),
+			cwd: v.optional(v.pipe(v.string(), v.minLength(1))),
 			timeout: v.optional(v.number()),
 		}),
 	},
@@ -216,7 +225,7 @@ export const sandbox_exec_tool = defineTool(
 		if (cwd) {
 			args.push('--cwd', cwd);
 		}
-		if (timeout !== undefined) {
+		if (timeout \!== undefined) {
 			args.push('--timeout', String(timeout));
 		}
 
