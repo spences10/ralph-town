@@ -9,6 +9,8 @@ import type { Image } from '@daytonaio/sdk';
  * Options for creating a sandbox
  */
 export interface CreateSandboxOptions {
+	/** Sandbox name */
+	name?: string;
 	/** Snapshot name to use (skips image building) */
 	snapshot?: string;
 	/** Docker image name or Daytona Image object */

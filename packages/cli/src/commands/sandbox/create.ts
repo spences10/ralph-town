@@ -25,7 +25,7 @@ export default defineCommand({
 		},
 		name: {
 			type: 'string',
-			description: 'Sandbox name label',
+			description: 'Sandbox name',
 		},
 		'auto-stop': {
 			type: 'string',
@@ -67,11 +67,11 @@ export default defineCommand({
 
 		try {
 			const sandbox = await create_sandbox({
+				name: args.name,
 				snapshot: args.snapshot,
 				image: args.image,
 				auto_stop_interval: auto_stop,
 				timeout,
-				labels: args.name ? { name: args.name } : undefined,
 				env_vars: Object.keys(env_vars).length > 0 ? env_vars : undefined,
 				on_build_log: (args.json || args.snapshot) ? undefined : (chunk) => process.stdout.write(chunk),
 			});
