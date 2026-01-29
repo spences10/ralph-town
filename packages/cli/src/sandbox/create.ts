@@ -48,6 +48,7 @@ export async function create_sandbox(
 	if (options.snapshot) {
 		const sandbox = await daytona.create(
 			{
+				name: options.name,
 				snapshot: options.snapshot,
 				language: 'typescript',
 				envVars: options.env_vars,
@@ -88,6 +89,7 @@ export async function create_sandbox(
 
 	const sandbox = await daytona.create(
 		{
+			name: options.name,
 			image,
 			language: 'typescript',
 			envVars: options.env_vars,
