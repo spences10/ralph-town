@@ -53,15 +53,17 @@ export const sandbox_create_tool = defineTool(
 	{
 		name: 'sandbox_create',
 		description:
-			'Create a new Daytona sandbox with pre-baked image (node:22-slim with git, typescript, tsx). Options: image (base Docker image), name (sandbox label), auto_stop (minutes, 0 to disable), timeout (seconds, default 120)',
+			'Create a new Daytona sandbox with pre-baked image (node:22-slim with git, typescript, tsx). Options: image (base Docker image), name (sandbox label), auto_stop (minutes, 0 to disable), timeout (seconds, default 120), snapshot (snapshot ID to create from), env (environment variables as KEY=value)',
 		schema: v.object({
-			image: v.optional(v.string()),
-			name: v.optional(v.string()),
+			image: v.optional(v.pipe(v.string(), v.minLength(1))),
+			name: v.optional(v.pipe(v.string(), v.minLength(1))),
 			auto_stop: v.optional(v.number()),
 			timeout: v.optional(v.number()),
+			snapshot: v.optional(v.pipe(v.string(), v.minLength(1))),
+			env: v.optional(v.array(v.pipe(v.string(), v.minLength(1)))),
 		}),
 	},
-	async ({ image, name, auto_stop, timeout }) => {
+	async ({ image, name, auto_stop, timeout, snapshot, env }) => {
 		const args = ['sandbox', 'create', '--json'];
 
 		if (image) {
@@ -75,6 +77,14 @@ export const sandbox_create_tool = defineTool(
 		}
 		if (timeout !== undefined) {
 			args.push('--timeout', String(timeout));
+		}
+		if (snapshot) {
+			args.push('--snapshot', snapshot);
+		}
+		if (env && env.length > 0) {
+			for (const e of env) {
+				args.push('--env', e);
+			}
 		}
 
 		const result = await run_cli(args);
