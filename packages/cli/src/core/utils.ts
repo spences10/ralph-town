@@ -125,3 +125,19 @@ export function parse_int_flag_or_exit(
 		process.exit(1);
 	}
 }
+
+/**
+ * Escape a string for safe use in shell commands
+ * Uses single quotes and escapes any embedded single quotes
+ */
+export function shell_escape(str: string): string {
+	return `'${str.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * Validate git branch name (reject unsafe characters)
+ * Allows alphanumeric, hyphens, underscores, slashes, dots
+ */
+export function validate_branch_name(branch: string): boolean {
+	return /^[a-zA-Z0-9_.\-/]+$/.test(branch) && !branch.includes('..');
+}

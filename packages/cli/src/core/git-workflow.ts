@@ -6,7 +6,13 @@
 import { spawn } from 'child_process';
 import type { RuntimeEnvironment } from './runtime/types.js';
 import type { GitConfig, RepositoryConfig } from './types.js';
-import { GREEN, RESET, print_error, print_message } from './utils.js';
+import {
+	GREEN,
+	RESET,
+	print_error,
+	print_message,
+	shell_escape,
+} from './utils.js';
 
 /**
  * Execute command with array args (safe from injection)
@@ -92,13 +98,19 @@ async function install_dependencies(
 	runtime: RuntimeEnvironment,
 	repo_path: string,
 ): Promise<void> {
+	const escaped_path = shell_escape(repo_path);
+
 	// Detect package manager from lockfile
 	const lockfile_check = await runtime.execute(
-		`cd ${repo_path} && if [ -f pnpm-lock.yaml ]; then echo "pnpm"; elif [ -f bun.lockb ] || [ -f bun.lock ]; then echo "bun"; elif [ -f yarn.lock ]; then echo "yarn"; elif [ -f package-lock.json ]; then echo "npm"; elif [ -f package.json ]; then echo "npm"; fi`,
+		`cd ${escaped_path} && if [ -f pnpm-lock.yaml ]; then echo "pnpm"; elif [ -f bun.lockb ] || [ -f bun.lock ]; then echo "bun"; elif [ -f yarn.lock ]; then echo "yarn"; elif [ -f package-lock.json ]; then echo "npm"; elif [ -f package.json ]; then echo "npm"; fi`,
 	);
 	const pkg_manager = lockfile_check.stdout.trim();
 
 	if (!pkg_manager) return;
+
+	// Validate package manager name (must be one of known values)
+	const valid_managers = ['pnpm', 'bun', 'yarn', 'npm'];
+	if (!valid_managers.includes(pkg_manager)) return;
 
 	// Install package manager on-demand if not npm
 	if (pkg_manager === 'pnpm') {
@@ -114,7 +126,7 @@ async function install_dependencies(
 		`Installing dependencies (${pkg_manager})...`,
 	);
 	const result = await runtime.execute(
-		`cd ${repo_path} && ${pkg_manager} install`,
+		`cd ${escaped_path} && ${pkg_manager} install`,
 		{
 			timeout: 120000,
 		},
