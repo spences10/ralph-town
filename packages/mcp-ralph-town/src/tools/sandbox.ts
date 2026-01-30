@@ -135,7 +135,7 @@ export const sandbox_create_tool = defineTool(
 				return tool.text(result.stdout || 'Sandbox created successfully');
 			}
 		} else {
-			return tool.text(
+			return tool.error(
 				`Failed to create sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
 			);
 		}
@@ -171,7 +171,7 @@ export const sandbox_list_tool = defineTool(
 				return tool.text(result.stdout);
 			}
 		} else {
-			return tool.text(
+			return tool.error(
 				`Failed to list sandboxes (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
 			);
 		}
@@ -208,7 +208,7 @@ export const sandbox_ssh_tool = defineTool(
 				return tool.text(result.stdout);
 			}
 		} else {
-			return tool.text(
+			return tool.error(
 				`Failed to get SSH access (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
 			);
 		}
@@ -245,7 +245,7 @@ export const sandbox_delete_tool = defineTool(
 				return tool.text(result.stdout || `Sandbox ${id} deleted successfully`);
 			}
 		} else {
-			return tool.text(
+			return tool.error(
 				`Failed to delete sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
 			);
 		}
@@ -287,7 +287,7 @@ export const sandbox_exec_tool = defineTool(
 				return tool.text(result.stdout);
 			}
 		} else {
-			return tool.text(
+			return tool.error(
 				`Command failed (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
 			);
 		}
