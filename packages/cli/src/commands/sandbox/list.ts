@@ -36,7 +36,8 @@ export default defineCommand({
 				} else {
 					console.error('Error: ' + error.message);
 				}
-				process.exit(1);
+				process.exitCode = 1;
+				return;
 			}
 			throw error;
 		}

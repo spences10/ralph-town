@@ -152,7 +152,8 @@ export default defineCommand({
 					console.log(
 						'  bun run packages/cli/src/core/create-snapshot.ts --force',
 					);
-					process.exit(1);
+					process.exitCode = 1;
+					return;
 				}
 			}
 		} catch (error) {
@@ -180,7 +181,8 @@ export default defineCommand({
 			} else {
 				console.error(`\n\x1b[31mError: ${message}\x1b[0m`);
 			}
-			process.exit(1);
+			process.exitCode = 1;
+			return;
 		}
 	},
 });
