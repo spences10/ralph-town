@@ -1,5 +1,24 @@
 # Daytona SDK API Gotchas
 
+## SANDBOX SSH - READ THIS FIRST
+
+When working in a sandbox via SSH:
+
+1. **GH_TOKEN IS AVAILABLE** - don't check, just use `$GH_TOKEN`
+2. **USE FULL PATHS** - `/usr/bin/git` not `git`
+3. **WORK DIR** - `/home/daytona` not `/workspaces`
+
+**JUST RUN:**
+```bash
+cd /home/daytona
+/usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+```
+
+**DON'T WASTE TIME ON:**
+- `echo $GH_TOKEN` - it's there, trust it
+- `which git` - PATH is broken, use full paths
+- checking if commands exist - just run them
+
 ## CLI: Environment Variables Must Be Sourced
 
 The `--env` flag uses shell expansion. Variables in `.env` won't expand
