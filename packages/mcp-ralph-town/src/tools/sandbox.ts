@@ -4,11 +4,26 @@
  */
 
 import { spawn } from 'child_process';
+import { isAbsolute } from 'path';
 import { defineTool } from 'tmcp/tool';
 import { tool } from 'tmcp/utils';
 import * as v from 'valibot';
 
-const cli_path = process.env.RALPH_TOWN_CLI_PATH || 'ralph-town';
+function get_cli_path(): string {
+	const env_path = process.env.RALPH_TOWN_CLI_PATH;
+	if (!env_path) {
+		return 'ralph-town';
+	}
+	// Allow 'ralph-town' explicitly, otherwise require absolute path
+	if (env_path !== 'ralph-town' && !isAbsolute(env_path)) {
+		throw new Error(
+			`RALPH_TOWN_CLI_PATH must be an absolute path, got: ${env_path}`,
+		);
+	}
+	return env_path;
+}
+
+const cli_path = get_cli_path();
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 
 /**

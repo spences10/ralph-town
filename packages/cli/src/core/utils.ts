@@ -12,10 +12,7 @@ export const RED = `${ESC}31m`;
 /**
  * Render markdown-like syntax to terminal formatting
  */
-export function render_markdown(
-	text: string,
-	color?: string,
-): string {
+export function render_markdown(text: string, color?: string): string {
 	const color_code = color ?? RESET;
 
 	// Bold: **text**
@@ -31,10 +28,7 @@ export function render_markdown(
 	);
 
 	// Code: `text`
-	result = result.replace(
-		/`(.+?)`/g,
-		`${DIM}$1${RESET}${color_code}`,
-	);
+	result = result.replace(/`(.+?)`/g, `${DIM}$1${RESET}${color_code}`);
 
 	return result;
 }
@@ -82,4 +76,52 @@ export function extract_developer_tasks(text: string): string[] {
  */
 export function is_task_complete(text: string): boolean {
 	return text.includes('TASK_COMPLETE');
+}
+
+/**
+ * Parse and validate numeric CLI flag
+ * @param value - String value from CLI arg
+ * @param flag_name - Flag name for error message
+ * @param default_value - Default if value is undefined
+ * @returns Parsed integer
+ * @throws Error if value is not a valid integer
+ */
+export function parse_int_flag(
+	value: string | undefined,
+	flag_name: string,
+	default_value: number,
+): number {
+	if (value === undefined) {
+		return default_value;
+	}
+	const parsed = parseInt(value, 10);
+	if (Number.isNaN(parsed)) {
+		throw new Error(
+			`Invalid value for --${flag_name}: "${value}" is not a number`,
+		);
+	}
+	return parsed;
+}
+
+/**
+ * Parse numeric CLI flag with error handling and exit
+ * Consolidates repeated try/catch pattern from commands
+ */
+export function parse_int_flag_or_exit(
+	value: string | undefined,
+	flag_name: string,
+	default_value: number,
+	json_output?: boolean,
+): number {
+	try {
+		return parse_int_flag(value, flag_name, default_value);
+	} catch (error) {
+		const msg = error instanceof Error ? error.message : String(error);
+		if (json_output) {
+			console.error(JSON.stringify({ error: msg }));
+		} else {
+			console.error('Error: ' + msg);
+		}
+		process.exit(1);
+	}
 }
