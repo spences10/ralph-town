@@ -3,8 +3,7 @@
  * Executes commands directly on the host via child_process
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { readFile, writeFile, access, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -17,7 +16,36 @@ import type {
 	GitStatus,
 } from './types.js';
 
-const exec_async = promisify(exec);
+/**
+ * Execute command with array args (safe from injection)
+ */
+async function spawn_cmd(
+	cmd: string,
+	args: string[],
+	opts?: { cwd?: string; env?: Record<string, string>; timeout?: number },
+): Promise<ExecuteResult> {
+	return new Promise((resolve) => {
+		const proc = spawn(cmd, args, {
+			cwd: opts?.cwd,
+			env: { ...process.env, ...opts?.env },
+			timeout: opts?.timeout || 120000,
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		proc.stdout?.on('data', (data) => (stdout += data));
+		proc.stderr?.on('data', (data) => (stderr += data));
+
+		proc.on('close', (code) => {
+			resolve({ stdout, stderr, exit_code: code || 0 });
+		});
+
+		proc.on('error', (err) => {
+			resolve({ stdout, stderr: err.message, exit_code: 1 });
+		});
+	});
+}
 
 export class LocalRuntime implements RuntimeEnvironment {
 	readonly type = 'local' as const;
@@ -60,26 +88,9 @@ export class LocalRuntime implements RuntimeEnvironment {
 		const cwd = opts?.cwd || this.workspace;
 		const timeout = opts?.timeout || 120000;
 
-		try {
-			const { stdout, stderr } = await exec_async(cmd, {
-				cwd,
-				timeout,
-				env: { ...process.env, ...opts?.env },
-				maxBuffer: 10 * 1024 * 1024,
-			});
-			return { stdout, stderr, exit_code: 0 };
-		} catch (error: unknown) {
-			const err = error as {
-				stdout?: string;
-				stderr?: string;
-				code?: number;
-			};
-			return {
-				stdout: err.stdout || '',
-				stderr: err.stderr || String(error),
-				exit_code: err.code || 1,
-			};
-		}
+		// For backwards compat, parse simple commands
+		// But git operations should use spawn_git directly
+		return spawn_cmd('sh', ['-c', cmd], { cwd, env: opts?.env, timeout });
 	}
 
 	async write_file(path: string, content: Buffer | string): Promise<void> {
@@ -99,6 +110,16 @@ export class LocalRuntime implements RuntimeEnvironment {
 		}
 	}
 
+	/**
+	 * Spawn git with array args (injection-safe)
+	 */
+	private async spawn_git(
+		args: string[],
+		cwd?: string,
+	): Promise<ExecuteResult> {
+		return spawn_cmd('git', args, { cwd: cwd || this.workspace });
+	}
+
 	git: GitOperations = {
 		clone: async (
 			url: string,
@@ -106,14 +127,19 @@ export class LocalRuntime implements RuntimeEnvironment {
 			branch?: string,
 			token?: string,
 		) => {
-			const branch_flag = branch ? `-b ${branch}` : '';
 			if (token && url.includes('github.com')) {
 				// Use GIT_ASKPASS to avoid exposing token in command/logs
-				const askpass_script = `#!/bin/sh\necho ${token}`;
+				const askpass_script = `#!/bin/sh\necho "${token}"`;
 				const askpass_path = join(tmpdir(), `git-askpass-${randomUUID().slice(0, 8)}`);
 				await writeFile(askpass_path, askpass_script, { mode: 0o700 });
 				try {
-					await this.execute(`git clone ${branch_flag} ${url} ${path}`, {
+					const args = ['clone'];
+					if (branch) {
+						args.push('-b', branch);
+					}
+					args.push(url, path);
+					await spawn_cmd('git', args, {
+						cwd: this.workspace,
 						env: {
 							GIT_ASKPASS: askpass_path,
 							GIT_TERMINAL_PROMPT: '0',
@@ -123,40 +149,51 @@ export class LocalRuntime implements RuntimeEnvironment {
 					await rm(askpass_path, { force: true });
 				}
 			} else {
-				await this.execute(`git clone ${branch_flag} ${url} ${path}`);
+				const args = ['clone'];
+				if (branch) {
+					args.push('-b', branch);
+				}
+				args.push(url, path);
+				await this.spawn_git(args);
 			}
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
-			const flag = create ? '-b' : '';
-			await this.execute(`git checkout ${flag} ${branch}`);
+			const args = ['checkout'];
+			if (create) {
+				args.push('-b');
+			}
+			args.push(branch);
+			await this.spawn_git(args);
 		},
 
 		add: async (files: string[]) => {
-			await this.execute(`git add ${files.join(' ')}`);
+			await this.spawn_git(['add', ...files]);
 		},
 
 		commit: async (message: string, author?: string, email?: string) => {
+			const args = [];
 			if (author && email) {
-				await this.execute(
-					`git -c user.name=${author} -c user.email=${email} commit -m ${message}`,
-				);
-			} else {
-				await this.execute(`git commit -m ${message}`);
+				args.push('-c', `user.name=${author}`, '-c', `user.email=${email}`);
 			}
+			args.push('commit', '-m', message);
+			await this.spawn_git(args);
 		},
 
 		push: async (branch: string, _token?: string) => {
-			await this.execute(`git push -u origin ${branch}`);
+			await this.spawn_git(['push', '-u', 'origin', branch]);
 		},
 
 		status: async (): Promise<GitStatus> => {
-			const result = await this.execute(
-				'git status --porcelain && git branch --show-current',
-			);
-			const lines = result.stdout.trim().split('\n');
-			const branch = lines.pop() || 'main';
-			const files = lines
+			const porcelain = await this.spawn_git(['status', '--porcelain']);
+			const branch_result = await this.spawn_git([
+				'branch',
+				'--show-current',
+			]);
+			const branch = branch_result.stdout.trim() || 'main';
+			const files = porcelain.stdout
+				.trim()
+				.split('\n')
 				.filter((l) => l.trim())
 				.map((l) => ({
 					name: l.slice(3),
@@ -171,14 +208,12 @@ export class LocalRuntime implements RuntimeEnvironment {
 
 		create_worktree: async (branch: string): Promise<string> => {
 			const worktree_path = `${this.workspace}/.worktrees/${branch}`;
-			await this.execute(
-				`git worktree add ${worktree_path} -b ${branch}`,
-			);
+			await this.spawn_git(['worktree', 'add', worktree_path, '-b', branch]);
 			return worktree_path;
 		},
 
 		remove_worktree: async (path: string): Promise<void> => {
-			await this.execute(`git worktree remove ${path} --force`);
+			await this.spawn_git(['worktree', 'remove', path, '--force']);
 		},
 	};
 }
