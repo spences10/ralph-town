@@ -9,12 +9,14 @@ import { tool } from 'tmcp/utils';
 import * as v from 'valibot';
 
 const cli_path = process.env.RALPH_TOWN_CLI_PATH || 'ralph-town';
+const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 
 /**
  * Execute CLI command and return result
  */
 function run_cli(
 	args: string[],
+	timeout_ms: number = DEFAULT_TIMEOUT_MS,
 ): Promise<{ stdout: string; stderr: string; exit_code: number }> {
 	return new Promise((resolve) => {
 		const proc = spawn(cli_path, args, {
@@ -23,6 +25,17 @@ function run_cli(
 
 		let stdout = '';
 		let stderr = '';
+		let timed_out = false;
+
+		const timeout_id = setTimeout(() => {
+			timed_out = true;
+			proc.kill('SIGTERM');
+			setTimeout(() => {
+				if (!proc.killed) {
+					proc.kill('SIGKILL');
+				}
+			}, 5000);
+		}, timeout_ms);
 
 		proc.stdout?.on('data', (data) => {
 			stdout += data.toString();
@@ -33,10 +46,20 @@ function run_cli(
 		});
 
 		proc.on('close', (code) => {
-			resolve({ stdout, stderr, exit_code: code ?? 1 });
+			clearTimeout(timeout_id);
+			if (timed_out) {
+				resolve({
+					stdout,
+					stderr: `Command timed out after ${timeout_ms}ms\n${stderr}`,
+					exit_code: 124,
+				});
+			} else {
+				resolve({ stdout, stderr, exit_code: code ?? 1 });
+			}
 		});
 
 		proc.on('error', (err) => {
+			clearTimeout(timeout_id);
 			resolve({
 				stdout: '',
 				stderr: err.message,
