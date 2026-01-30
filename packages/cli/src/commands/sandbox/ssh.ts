@@ -9,6 +9,11 @@ import {
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
 
+function mask_token(token: string): string {
+	if (token.length <= 4) return '****';
+	return `****${token.slice(-4)}`;
+}
+
 export default defineCommand({
 	meta: {
 		name: 'ssh',
@@ -62,7 +67,7 @@ export default defineCommand({
 			);
 		} else {
 			console.log(`SSH Command:\n${access.sshCommand}\n`);
-			console.log(`Token: ${access.token}`);
+			console.log(`Token: ${mask_token(access.token)}`);
 			console.log(`Expires: ${access.expiresAt}`);
 		}
 	},

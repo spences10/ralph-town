@@ -106,15 +106,25 @@ export class LocalRuntime implements RuntimeEnvironment {
 			branch?: string,
 			token?: string,
 		) => {
-			let auth_url = url;
-			if (token && url.includes('github.com')) {
-				auth_url = url.replace(
-					'https://github.com',
-					`https://git:${token}@github.com`,
-				);
-			}
 			const branch_flag = branch ? `-b ${branch}` : '';
-			await this.execute(`git clone ${branch_flag} ${auth_url} ${path}`);
+			if (token && url.includes('github.com')) {
+				// Use GIT_ASKPASS to avoid exposing token in command/logs
+				const askpass_script = `#!/bin/sh\necho ${token}`;
+				const askpass_path = join(tmpdir(), `git-askpass-${randomUUID().slice(0, 8)}`);
+				await writeFile(askpass_path, askpass_script, { mode: 0o700 });
+				try {
+					await this.execute(`git clone ${branch_flag} ${url} ${path}`, {
+						env: {
+							GIT_ASKPASS: askpass_path,
+							GIT_TERMINAL_PROMPT: '0',
+						},
+					});
+				} finally {
+					await rm(askpass_path, { force: true });
+				}
+			} else {
+				await this.execute(`git clone ${branch_flag} ${url} ${path}`);
+			}
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
@@ -129,10 +139,10 @@ export class LocalRuntime implements RuntimeEnvironment {
 		commit: async (message: string, author?: string, email?: string) => {
 			if (author && email) {
 				await this.execute(
-					`git -c user.name="${author}" -c user.email="${email}" commit -m "${message}"`,
+					`git -c user.name=${author} -c user.email=${email} commit -m ${message}`,
 				);
 			} else {
-				await this.execute(`git commit -m "${message}"`);
+				await this.execute(`git commit -m ${message}`);
 			}
 		},
 
@@ -162,13 +172,13 @@ export class LocalRuntime implements RuntimeEnvironment {
 		create_worktree: async (branch: string): Promise<string> => {
 			const worktree_path = `${this.workspace}/.worktrees/${branch}`;
 			await this.execute(
-				`git worktree add "${worktree_path}" -b "${branch}"`,
+				`git worktree add ${worktree_path} -b ${branch}`,
 			);
 			return worktree_path;
 		},
 
 		remove_worktree: async (path: string): Promise<void> => {
-			await this.execute(`git worktree remove "${path}" --force`);
+			await this.execute(`git worktree remove ${path} --force`);
 		},
 	};
 }

@@ -5,9 +5,10 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, readFile, access, mkdir } from 'fs/promises';
+import { writeFile, readFile, access, mkdir, rm } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
+import { tmpdir } from 'os';
 import type {
 	RuntimeEnvironment,
 	ExecuteOptions,
@@ -222,15 +223,29 @@ DOCKERFILE`,
 			branch?: string,
 			token?: string,
 		) => {
-			let auth_url = url;
-			if (token && url.includes('github.com')) {
-				auth_url = url.replace(
-					'https://github.com',
-					`https://git:${token}@github.com`,
-				);
-			}
 			const branch_flag = branch ? `-b ${branch}` : '';
-			await this.execute(`git clone ${branch_flag} "${auth_url}" "${path}"`);
+			if (token && url.includes('github.com')) {
+				// Use GIT_ASKPASS to avoid exposing token in command/logs
+				const askpass_script = `#!/bin/sh\necho "${token}"`;
+				const askpass_path = join(tmpdir(), `git-askpass-${randomUUID().slice(0, 8)}`);
+				await writeFile(askpass_path, askpass_script, { mode: 0o700 });
+				// Copy askpass script into container
+				const container_askpass = `/tmp/git-askpass-${randomUUID().slice(0, 8)}`;
+				await this.run_local(
+					`docker cp "${askpass_path}" "${this.container_id}:${container_askpass}"`,
+				);
+				await this.execute(`chmod 700 "${container_askpass}"`);
+				try {
+					await this.execute(
+						`GIT_ASKPASS="${container_askpass}" GIT_TERMINAL_PROMPT=0 git clone ${branch_flag} "${url}" "${path}"`,
+					);
+				} finally {
+					await rm(askpass_path, { force: true });
+					await this.execute(`rm -f "${container_askpass}"`);
+				}
+			} else {
+				await this.execute(`git clone ${branch_flag} "${url}" "${path}"`);
+			}
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
