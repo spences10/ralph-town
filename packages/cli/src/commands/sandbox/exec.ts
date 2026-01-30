@@ -63,6 +63,10 @@ export default defineCommand({
 			args.json,
 		);
 
+		// KNOWN ISSUE: executeCommand returns exit code -1 with empty stdout
+		// on snapshot-based sandboxes. This is a Daytona SDK bug.
+		// Workaround: Use SSH instead (see sandbox ssh command).
+		// Upstream issue: https://github.com/daytonaio/daytona/issues/2283
 		const result = await sandbox.process.executeCommand(
 			args.cmd,
 			args.cwd,
