@@ -4,8 +4,10 @@
  */
 
 import { spawn } from 'child_process';
-import { writeFile, readFile, access, mkdir } from 'fs/promises';
+import { writeFile, readFile, access, mkdir, rm } from 'fs/promises';
 import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import type {
 	RuntimeEnvironment,
 	ExecuteOptions,
@@ -245,19 +247,47 @@ WORKDIR /workspace
 			branch?: string,
 			token?: string,
 		) => {
-			let auth_url = url;
 			if (token && url.includes('github.com')) {
-				auth_url = url.replace(
-					'https://github.com',
-					`https://git:${token}@github.com`,
-				);
+				// Use GIT_ASKPASS to avoid exposing token in command/logs
+				const askpass_script = `#!/bin/sh\necho "${token}"`;
+				const askpass_path = join(tmpdir(), `git-askpass-${randomUUID().slice(0, 8)}`);
+				await writeFile(askpass_path, askpass_script, { mode: 0o700 });
+				// Copy askpass script into container
+				const container_askpass = `/tmp/git-askpass-${randomUUID().slice(0, 8)}`;
+				await spawn_cmd('docker', ['cp', askpass_path, `${this.container_id}:${container_askpass}`]);
+				await this.execute(`chmod 700 "${container_askpass}"`);
+				try {
+					const args = ['clone'];
+					if (branch) {
+						args.push('-b', branch);
+					}
+					args.push(url, path);
+					// Run git clone with GIT_ASKPASS set
+					await spawn_cmd(
+						'docker',
+						[
+							'exec',
+							'-e', `GIT_ASKPASS=${container_askpass}`,
+							'-e', 'GIT_TERMINAL_PROMPT=0',
+							'-w', this.workspace,
+							this.container_id,
+							'git',
+							...args,
+						],
+						{ timeout: 120000 },
+					);
+				} finally {
+					await rm(askpass_path, { force: true });
+					await this.execute(`rm -f "${container_askpass}"`);
+				}
+			} else {
+				const args = ['clone'];
+				if (branch) {
+					args.push('-b', branch);
+				}
+				args.push(url, path);
+				await this.docker_git(args);
 			}
-			const args = ['clone'];
-			if (branch) {
-				args.push('-b', branch);
-			}
-			args.push(auth_url, path);
-			await this.docker_git(args);
 		},
 
 		checkout: async (branch: string, create?: boolean) => {

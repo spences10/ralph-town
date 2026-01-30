@@ -127,19 +127,35 @@ export class LocalRuntime implements RuntimeEnvironment {
 			branch?: string,
 			token?: string,
 		) => {
-			let auth_url = url;
 			if (token && url.includes('github.com')) {
-				auth_url = url.replace(
-					'https://github.com',
-					`https://git:${token}@github.com`,
-				);
+				// Use GIT_ASKPASS to avoid exposing token in command/logs
+				const askpass_script = `#!/bin/sh\necho "${token}"`;
+				const askpass_path = join(tmpdir(), `git-askpass-${randomUUID().slice(0, 8)}`);
+				await writeFile(askpass_path, askpass_script, { mode: 0o700 });
+				try {
+					const args = ['clone'];
+					if (branch) {
+						args.push('-b', branch);
+					}
+					args.push(url, path);
+					await spawn_cmd('git', args, {
+						cwd: this.workspace,
+						env: {
+							GIT_ASKPASS: askpass_path,
+							GIT_TERMINAL_PROMPT: '0',
+						},
+					});
+				} finally {
+					await rm(askpass_path, { force: true });
+				}
+			} else {
+				const args = ['clone'];
+				if (branch) {
+					args.push('-b', branch);
+				}
+				args.push(url, path);
+				await this.spawn_git(args);
 			}
-			const args = ['clone'];
-			if (branch) {
-				args.push('-b', branch);
-			}
-			args.push(auth_url, path);
-			await this.spawn_git(args);
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
