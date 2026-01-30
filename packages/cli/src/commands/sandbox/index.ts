@@ -10,6 +10,7 @@ import list from './list.js';
 import del from './delete.js';
 import exec from './exec.js';
 import preflight from './preflight.js';
+import snapshot from './snapshot/index.js';
 
 export default defineCommand({
 	meta: {
@@ -23,5 +24,6 @@ export default defineCommand({
 		delete: del,
 		exec,
 		preflight,
+		snapshot,
 	},
 });
