@@ -3,11 +3,9 @@
  * Spins up isolated containers dynamically, similar to Daytona
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { writeFile, readFile, access, mkdir } from 'fs/promises';
 import { randomUUID } from 'crypto';
-import { join } from 'path';
 import type {
 	RuntimeEnvironment,
 	ExecuteOptions,
@@ -16,10 +14,37 @@ import type {
 	GitStatus,
 } from './types.js';
 
-const exec_async = promisify(exec);
-
 // Pre-built image with all dependencies
 const CONTAINER_IMAGE = 'ralph-devcontainer:latest';
+
+/**
+ * Execute command with array args (safe from injection)
+ */
+async function spawn_cmd(
+	cmd: string,
+	args: string[],
+	opts?: { timeout?: number },
+): Promise<ExecuteResult> {
+	return new Promise((resolve) => {
+		const proc = spawn(cmd, args, {
+			timeout: opts?.timeout || 120000,
+		});
+
+		let stdout = '';
+		let stderr = '';
+
+		proc.stdout?.on('data', (data) => (stdout += data));
+		proc.stderr?.on('data', (data) => (stderr += data));
+
+		proc.on('close', (code) => {
+			resolve({ stdout, stderr, exit_code: code || 0 });
+		});
+
+		proc.on('error', (err) => {
+			resolve({ stdout, stderr: err.message, exit_code: 1 });
+		});
+	});
+}
 
 export class DevContainerRuntime implements RuntimeEnvironment {
 	readonly type = 'devcontainer' as const;
@@ -43,9 +68,11 @@ export class DevContainerRuntime implements RuntimeEnvironment {
 
 	async initialize(): Promise<void> {
 		// Check if image exists, build if not
-		const { exit_code } = await this.run_local(
-			`docker image inspect ${CONTAINER_IMAGE}`,
-		);
+		const { exit_code } = await this.run_local_spawn('docker', [
+			'image',
+			'inspect',
+			CONTAINER_IMAGE,
+		]);
 		if (exit_code !== 0) {
 			console.log('Building devcontainer image...');
 			await this.build_image();
@@ -53,16 +80,24 @@ export class DevContainerRuntime implements RuntimeEnvironment {
 
 		// Start container with workspace mount
 		console.log('Starting devcontainer...');
-		const { stdout } = await this.run_local(
-			`docker run -d \
-				--label devcontainer.ralph=${this._id} \
-				-v "${this.host_workspace}:${this.workspace}" \
-				-w ${this.workspace} \
-				--env ANTHROPIC_API_KEY \
-				--env GITHUB_PAT \
-				${CONTAINER_IMAGE} \
-				tail -f /dev/null`,
-		);
+		const { stdout } = await this.run_local_spawn('docker', [
+			'run',
+			'-d',
+			'--label',
+			`devcontainer.ralph=${this._id}`,
+			'-v',
+			`${this.host_workspace}:${this.workspace}`,
+			'-w',
+			this.workspace,
+			'--env',
+			'ANTHROPIC_API_KEY',
+			'--env',
+			'GITHUB_PAT',
+			CONTAINER_IMAGE,
+			'tail',
+			'-f',
+			'/dev/null',
+		]);
 		this.container_id = stdout.trim();
 
 		if (!this.container_id) {
@@ -85,42 +120,35 @@ RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*
 RUN npm i -g bun tsx @anthropic-ai/claude-agent-sdk
 WORKDIR /workspace
 `;
-		const result = await this.run_local(
-			`docker build -t ${CONTAINER_IMAGE} -f - . <<'DOCKERFILE'
-${dockerfile}
-DOCKERFILE`,
-		);
+		// Write dockerfile to temp, then build
+		const tmp_dockerfile = `/tmp/ralph-dockerfile-${Date.now()}`;
+		await writeFile(tmp_dockerfile, dockerfile);
+
+		const result = await this.run_local_spawn('docker', [
+			'build',
+			'-t',
+			CONTAINER_IMAGE,
+			'-f',
+			tmp_dockerfile,
+			'.',
+		]);
 		if (result.exit_code !== 0) {
 			throw new Error(`Failed to build image: ${result.stderr}`);
 		}
 	}
 
-	private async run_local(cmd: string): Promise<ExecuteResult> {
-		try {
-			const { stdout, stderr } = await exec_async(cmd, {
-				timeout: 300000,
-				maxBuffer: 10 * 1024 * 1024,
-			});
-			return { stdout, stderr, exit_code: 0 };
-		} catch (error: unknown) {
-			const err = error as {
-				stdout?: string;
-				stderr?: string;
-				code?: number;
-			};
-			return {
-				stdout: err.stdout || '',
-				stderr: err.stderr || String(error),
-				exit_code: err.code || 1,
-			};
-		}
+	private async run_local_spawn(
+		cmd: string,
+		args: string[],
+	): Promise<ExecuteResult> {
+		return spawn_cmd(cmd, args, { timeout: 300000 });
 	}
 
 	async cleanup(): Promise<void> {
 		if (this.container_id) {
 			console.log('Stopping devcontainer...');
-			await this.run_local(`docker stop ${this.container_id}`);
-			await this.run_local(`docker rm ${this.container_id}`);
+			await this.run_local_spawn('docker', ['stop', this.container_id]);
+			await this.run_local_spawn('docker', ['rm', this.container_id]);
 		}
 	}
 
@@ -131,36 +159,18 @@ DOCKERFILE`,
 		const cwd = opts?.cwd || this.workspace;
 		const timeout = opts?.timeout || 120000;
 
-		// Build env string
-		let env_str = '';
+		// Build docker exec args safely
+		const args = ['exec'];
+
 		if (opts?.env) {
-			env_str = Object.entries(opts.env)
-				.map(([k, v]) => `-e ${k}="${v}"`)
-				.join(' ');
+			for (const [k, v] of Object.entries(opts.env)) {
+				args.push('-e', `${k}=${v}`);
+			}
 		}
 
-		// Escape command for shell
-		const escaped_cmd = cmd.replace(/"/g, '\\"');
-		const docker_cmd = `docker exec ${env_str} -w "${cwd}" ${this.container_id} sh -c "${escaped_cmd}"`;
+		args.push('-w', cwd, this.container_id, 'sh', '-c', cmd);
 
-		try {
-			const { stdout, stderr } = await exec_async(docker_cmd, {
-				timeout,
-				maxBuffer: 10 * 1024 * 1024,
-			});
-			return { stdout, stderr, exit_code: 0 };
-		} catch (error: unknown) {
-			const err = error as {
-				stdout?: string;
-				stderr?: string;
-				code?: number;
-			};
-			return {
-				stdout: err.stdout || '',
-				stderr: err.stderr || String(error),
-				exit_code: err.code || 1,
-			};
-		}
+		return spawn_cmd('docker', args, { timeout });
 	}
 
 	async write_file(path: string, content: Buffer | string): Promise<void> {
@@ -178,9 +188,11 @@ DOCKERFILE`,
 			// Write to temp file then copy in
 			const tmp = `/tmp/ralph-${Date.now()}`;
 			await writeFile(tmp, content);
-			await this.run_local(
-				`docker cp "${tmp}" "${this.container_id}:${path}"`,
-			);
+			await this.run_local_spawn('docker', [
+				'cp',
+				tmp,
+				`${this.container_id}:${path}`,
+			]);
 		}
 	}
 
@@ -215,6 +227,17 @@ DOCKERFILE`,
 		}
 	}
 
+	/**
+	 * Execute git via docker exec with array args (injection-safe)
+	 */
+	private async docker_git(args: string[]): Promise<ExecuteResult> {
+		return spawn_cmd(
+			'docker',
+			['exec', '-w', this.workspace, this.container_id, 'git', ...args],
+			{ timeout: 120000 },
+		);
+	}
+
 	git: GitOperations = {
 		clone: async (
 			url: string,
@@ -229,43 +252,48 @@ DOCKERFILE`,
 					`https://git:${token}@github.com`,
 				);
 			}
-			const branch_flag = branch ? `-b ${branch}` : '';
-			await this.execute(`git clone ${branch_flag} "${auth_url}" "${path}"`);
+			const args = ['clone'];
+			if (branch) {
+				args.push('-b', branch);
+			}
+			args.push(auth_url, path);
+			await this.docker_git(args);
 		},
 
 		checkout: async (branch: string, create?: boolean) => {
-			const flag = create ? '-b' : '';
-			await this.execute(`git checkout ${flag} "${branch}"`);
+			const args = ['checkout'];
+			if (create) {
+				args.push('-b');
+			}
+			args.push(branch);
+			await this.docker_git(args);
 		},
 
 		add: async (files: string[]) => {
-			const file_list = files.map((f) => `"${f}"`).join(' ');
-			await this.execute(`git add ${file_list}`);
+			await this.docker_git(['add', ...files]);
 		},
 
 		commit: async (message: string, author?: string, email?: string) => {
-			const escaped_msg = message.replace(/"/g, '\\"');
+			const args = [];
 			if (author && email) {
-				await this.execute(
-					`git -c user.name="${author}" -c user.email="${email}" commit -m "${escaped_msg}"`,
-				);
-			} else {
-				await this.execute(`git commit -m "${escaped_msg}"`);
+				args.push('-c', `user.name=${author}`, '-c', `user.email=${email}`);
 			}
+			args.push('commit', '-m', message);
+			await this.docker_git(args);
 		},
 
 		push: async (branch: string, _token?: string) => {
-			await this.execute(`git push -u origin "${branch}"`);
+			await this.docker_git(['push', '-u', 'origin', branch]);
 		},
 
 		status: async (): Promise<GitStatus> => {
-			const result = await this.execute(
-				'git status --porcelain && echo "---BRANCH---" && git branch --show-current',
-			);
-			const parts = result.stdout.split('---BRANCH---');
-			const files_part = parts[0] || '';
-			const branch = (parts[1] || 'main').trim();
-			const files = files_part
+			const porcelain = await this.docker_git(['status', '--porcelain']);
+			const branch_result = await this.docker_git([
+				'branch',
+				'--show-current',
+			]);
+			const branch = branch_result.stdout.trim() || 'main';
+			const files = porcelain.stdout
 				.trim()
 				.split('\n')
 				.filter((l) => l.trim())
@@ -282,14 +310,24 @@ DOCKERFILE`,
 
 		create_worktree: async (branch: string): Promise<string> => {
 			const worktree_path = `${this.workspace}/.worktrees/${branch}`;
-			await this.execute(
-				`mkdir -p "${this.workspace}/.worktrees" && git worktree add "${worktree_path}" -b "${branch}"`,
+			// Create parent dir first
+			await spawn_cmd(
+				'docker',
+				[
+					'exec',
+					this.container_id,
+					'mkdir',
+					'-p',
+					`${this.workspace}/.worktrees`,
+				],
+				{ timeout: 10000 },
 			);
+			await this.docker_git(['worktree', 'add', worktree_path, '-b', branch]);
 			return worktree_path;
 		},
 
 		remove_worktree: async (path: string): Promise<void> => {
-			await this.execute(`git worktree remove "${path}" --force`);
+			await this.docker_git(['worktree', 'remove', path, '--force']);
 		},
 	};
 }
