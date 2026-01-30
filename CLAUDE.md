@@ -12,16 +12,33 @@ tool gives each teammate their own Daytona sandbox instead.
 
 ### Prerequisites
 
-1. Create snapshot once (has Bun, TypeScript, Claude Agent SDK):
+1. Set `GH_TOKEN` in `.env` (for teammates to push/PR)
+
+2. **Preflight check** - verify snapshot before spawning teammates:
+   ```bash
+   source .env
+   # Create test sandbox
+   bun run packages/cli/src/index.ts sandbox create --snapshot ralph-town-dev --json
+   # Get SSH and verify tools exist
+   bun run packages/cli/src/index.ts sandbox ssh <id> --json
+   ssh <token>@ssh.app.daytona.io "which gh && which git && bun --version"
+   # Delete test sandbox
+   bun run packages/cli/src/index.ts sandbox delete <id>
+   ```
+
+3. If tools missing, rebuild snapshot:
    ```bash
    bun run packages/cli/src/core/create-snapshot.ts
    ```
 
-2. Set `GH_TOKEN` in `.env` (for teammates to push/PR)
+**Required tools in snapshot:** gh, git, bun, curl
 
 ### Per-Teammate Flow
 
 ```bash
+# IMPORTANT: Source .env first so $GH_TOKEN expands
+source .env
+
 # 1. Create sandbox from snapshot with git token
 ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 # Returns sandbox ID
@@ -39,12 +56,25 @@ ralph-town sandbox ssh <sandbox-id>
 ralph-town sandbox delete <sandbox-id>
 ```
 
+### PR Best Practices
+
+- Include `Fixes #N` in PR body to auto-close issues on merge
+- Branch naming: `fix/issue-description` or `feat/feature-name`
+
 ### Known Issues
 
 - `sandbox exec` returns -1 (use SSH instead) - #31
 - SSH PATH broken, use full paths: `/usr/bin/git` - #33
-- Snapshot missing `gh` CLI (install via apt in sandbox) - #32
 - `--name` flag doesn't set display name - #34
+
+### Rebuilding Snapshot
+
+After updating `create-snapshot.ts`, rebuild:
+```bash
+bun run packages/cli/src/core/create-snapshot.ts
+```
+
+Current snapshot may be stale - if gh CLI missing, rebuild.
 
 ## Code Style
 
