@@ -14,6 +14,7 @@ import type {
 	GitStatus,
 	RuntimeEnvironment,
 } from './types.js';
+import { shell_escape, validate_branch_name } from '../utils.js';
 
 /**
  * Declarative image with pre-baked dependencies
@@ -129,7 +130,7 @@ export class DaytonaRuntime implements RuntimeEnvironment {
 
 	async file_exists(path: string): Promise<boolean> {
 		const result = await this.execute(
-			`test -f "${path}" && echo EXISTS`,
+			`test -f ${shell_escape(path)} && echo EXISTS`,
 		);
 		return result.stdout.trim() === 'EXISTS';
 	}
@@ -199,15 +200,20 @@ export class DaytonaRuntime implements RuntimeEnvironment {
 		},
 
 		create_worktree: async (branch: string): Promise<string> => {
+			if (!validate_branch_name(branch)) {
+				throw new Error(`Invalid branch name: ${branch}`);
+			}
 			const worktree_path = `${this.workspace}/.worktrees/${branch}`;
 			await this.execute(
-				`mkdir -p "${this.workspace}/.worktrees" && git worktree add "${worktree_path}" -b "${branch}"`,
+				`mkdir -p ${shell_escape(this.workspace + '/.worktrees')} && git worktree add ${shell_escape(worktree_path)} -b ${shell_escape(branch)}`,
 			);
 			return worktree_path;
 		},
 
 		remove_worktree: async (path: string): Promise<void> => {
-			await this.execute(`git worktree remove "${path}" --force`);
+			await this.execute(
+				`git worktree remove ${shell_escape(path)} --force`,
+			);
 		},
 	};
 

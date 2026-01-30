@@ -26,6 +26,15 @@ tool gives each teammate their own Daytona sandbox instead.
    bun run packages/cli/src/core/create-snapshot.ts --force
    ```
 
+### CRITICAL: Sandbox SSH Gotchas
+
+1. **Work dir is `/home/daytona`** - NOT `/workspaces`
+2. **PATH is broken** - MUST use full paths:
+   - `/usr/bin/git` not `git`
+   - `/bin/ls` not `ls`
+   - `/usr/bin/gh` not `gh`
+3. **GH_TOKEN works** - `$GH_TOKEN` is available if passed via `--env`
+
 ### Per-Teammate Flow
 
 **CRITICAL: Always use --snapshot flag. Never omit it.**
@@ -43,10 +52,16 @@ ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 ralph-town sandbox ssh <sandbox-id>
 # Returns: ssh <token>@ssh.app.daytona.io
 
-# 3. Teammate works in sandbox:
-#    - Clone repo with token: git clone https://$GH_TOKEN@github.com/...
-#    - Make changes, commit, push
-#    - Create PR via: gh pr create ...
+# 3. Teammate works in sandbox (USE FULL PATHS!):
+#    cd /home/daytona
+#    /usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+#    cd repo
+#    /usr/bin/git checkout -b fix/my-branch
+#    # make changes...
+#    /usr/bin/git add -A
+#    /usr/bin/git commit -m "message"
+#    /usr/bin/git push -u origin fix/my-branch
+#    /usr/bin/gh pr create --title "title" --body "body"
 
 # 4. Delete sandbox when done
 ralph-town sandbox delete <sandbox-id>
@@ -69,11 +84,13 @@ ralph-town sandbox delete <sandbox-id>
 - Include `Fixes #N` in PR body to auto-close issues on merge
 - Branch naming: `fix/issue-description` or `feat/feature-name`
 
-### Known Issues
+### Known Issues (READ THESE!)
 
+- **SSH PATH BROKEN** - use full paths: `/usr/bin/git` - #33
+- **Work dir is `/home/daytona`** - not /workspaces
 - `sandbox exec` returns -1 (use SSH instead) - #31
-- SSH PATH broken, use full paths: `/usr/bin/git` - #33
 - `--name` flag doesn't set display name - #34
+- gh CLI may be missing - rebuild snapshot if so
 
 ## Code Style
 
