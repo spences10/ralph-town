@@ -18,7 +18,7 @@
         "ralph-town": "./dist/index.js",
       },
       "dependencies": {
-        "@daytonaio/sdk": "^0.136.0",
+        "@daytonaio/sdk": "^0.138.0",
         "citty": "^0.2.0",
         "dotenv": "^17.2.3",
       },
@@ -167,11 +167,11 @@
 
     "@changesets/write": ["@changesets/write@0.4.0", "", { "dependencies": { "@changesets/types": "^6.1.0", "fs-extra": "^7.0.1", "human-id": "^4.1.1", "prettier": "^2.7.1" } }, "sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q=="],
 
-    "@daytonaio/api-client": ["@daytonaio/api-client@0.136.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-x80wBPdajeBclCLK740vN9RB18fn2ExQ/wFw2QoLglmcERqy/GZNd9BoGGImpKvPg9RSk46lyqFeE6YU/BrJ/g=="],
+    "@daytonaio/api-client": ["@daytonaio/api-client@0.138.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-mKO3Aqk2aCnOw4ej+UxvKE+Z1ixmo9OKTAFElkvRb6UOwb5zioudqTyqEfijkA2tXUXO8yPGhQDPaICLgpPopA=="],
 
-    "@daytonaio/sdk": ["@daytonaio/sdk@0.136.0", "", { "dependencies": { "@aws-sdk/client-s3": "^3.787.0", "@aws-sdk/lib-storage": "^3.798.0", "@daytonaio/api-client": "0.136.0", "@daytonaio/toolbox-api-client": "0.136.0", "@iarna/toml": "^2.2.5", "axios": "^1.11.0", "busboy": "^1.0.0", "dotenv": "^17.0.1", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.8.2", "tar": "^7.5.4" } }, "sha512-1iVXjixuURElQ1YAdmW0zZt49EqV+5QF7toL635NmxDv5jMas/qiXhm0sCdnocXij9TdZR+q2ThIiRnbuPeDkQ=="],
+    "@daytonaio/sdk": ["@daytonaio/sdk@0.138.0", "", { "dependencies": { "@aws-sdk/client-s3": "^3.787.0", "@aws-sdk/lib-storage": "^3.798.0", "@daytonaio/api-client": "0.138.0", "@daytonaio/toolbox-api-client": "0.138.0", "@iarna/toml": "^2.2.5", "axios": "^1.11.0", "busboy": "^1.0.0", "dotenv": "^17.0.1", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.8.2", "tar": "^7.5.4" } }, "sha512-cnbsflZYJ1NA4pQ2uX2lLN4w4ZQsO/xqdGDnpmwSu/LIW5F+O5gA8z4mfuWdIRcFFT4UhIpTzMuh3zRwxH7dIw=="],
 
-    "@daytonaio/toolbox-api-client": ["@daytonaio/toolbox-api-client@0.136.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-zwtM1tNtI9Fwe0Iob0WGkbFzJjeUXUnK9B1kLl1TdEIDHaTXzBNMWq4GBlPNg+CwkpY5xLA/+u89Jc8u8+Fqhw=="],
+    "@daytonaio/toolbox-api-client": ["@daytonaio/toolbox-api-client@0.138.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-unM9e7MOQiyDXdY8hCW1uTctYbxpo/TGZ6L71ZXyS/j2Cnz9/ud4VWBLcQP2VzlC+lrBP2YMrhT90zSSvcNfmA=="],
 
     "@iarna/toml": ["@iarna/toml@2.2.5", "", {}, "sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg=="],
 
