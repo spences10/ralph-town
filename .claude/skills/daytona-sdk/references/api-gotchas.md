@@ -1,5 +1,27 @@
 # Daytona SDK API Gotchas
 
+## CLI: Environment Variables Must Be Sourced
+
+The `--env` flag uses shell expansion. Variables in `.env` won't expand
+unless sourced first.
+
+**WRONG:**
+
+```bash
+# $GH_TOKEN is in .env but not exported - expands to empty string
+ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
+# Sandbox created with GH_TOKEN="" (empty!)
+```
+
+**CORRECT:**
+
+```bash
+# Source .env first so variables are in shell environment
+source .env
+ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
+# Sandbox created with actual token value
+```
+
 ## uploadFile Parameter Order
 
 **WRONG:**
