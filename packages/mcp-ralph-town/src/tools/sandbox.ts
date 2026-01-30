@@ -293,3 +293,70 @@ export const sandbox_exec_tool = defineTool(
 		}
 	},
 );
+
+/**
+ * sandbox_env_list - List environment variables for a sandbox
+ */
+export const sandbox_env_list_tool = defineTool(
+	{
+		name: 'sandbox_env_list',
+		description:
+			'List environment variables set on a Daytona sandbox. Required: id (sandbox ID or name)',
+		schema: v.object({
+			id: v.pipe(v.string(), v.minLength(1)),
+		}),
+	},
+	async ({ id }) => {
+		const args = ['sandbox', 'env', 'list', id, '--json'];
+
+		const result = await run_cli(args);
+
+		if (result.exit_code === 0) {
+			try {
+				const env_vars = JSON.parse(result.stdout);
+				return tool.text(JSON.stringify(env_vars, null, 2));
+			} catch {
+				return tool.text(result.stdout);
+			}
+		} else {
+			return tool.error(
+				`Failed to list env vars (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
+			);
+		}
+	},
+);
+
+/**
+ * sandbox_env_set - Set environment variable for a sandbox
+ */
+export const sandbox_env_set_tool = defineTool(
+	{
+		name: 'sandbox_env_set',
+		description:
+			'Set an environment variable in a sandbox shell session. Required: id (sandbox ID or name), key (variable name), value (variable value). Note: This only sets the variable in the current shell session. For persistent env vars, use --env flag when creating the sandbox.',
+		schema: v.object({
+			id: v.pipe(v.string(), v.minLength(1)),
+			key: v.pipe(v.string(), v.minLength(1)),
+			value: v.string(),
+		}),
+	},
+	async ({ id, key, value }) => {
+		const env_var = `${key}=${value}`;
+		const args = ['sandbox', 'env', 'set', id, env_var, '--json'];
+
+		const result = await run_cli(args);
+
+		if (result.exit_code === 0) {
+			try {
+				const set_result = JSON.parse(result.stdout);
+				return tool.text(JSON.stringify(set_result, null, 2));
+			} catch {
+				return tool.text(result.stdout || `Set ${key}=${value}`);
+			}
+		} else {
+			return tool.error(
+				`Failed to set env var (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
+			);
+		}
+	},
+);
