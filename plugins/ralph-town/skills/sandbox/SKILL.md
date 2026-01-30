@@ -11,7 +11,7 @@ Manage Daytona sandboxes for isolated teammate environments.
 
 ### Create Sandbox
 ```bash
-ralph-town sandbox create --snapshot ralph-town-dev --name <name> --env "GH_TOKEN=..."
+ralph-town sandbox create --name <name> --env "GH_TOKEN=..."
 ```
 
 ### List Sandboxes
@@ -36,11 +36,12 @@ ralph-town sandbox delete <id>
 
 ## Teammate Workflow
 
-1. Create sandbox with snapshot and GH_TOKEN
-2. Teammate clones repo inside sandbox
-3. Teammate makes changes, commits, pushes
-4. Teammate creates PR via gh CLI
-5. Delete sandbox when done
+1. Create sandbox with GH_TOKEN
+2. Install gh CLI: `apt-get update && apt-get install -y gh`
+3. Teammate clones repo inside sandbox
+4. Teammate makes changes, commits, pushes
+5. Teammate creates PR via gh CLI
+6. Delete sandbox when done
 
 ## SSH Tips
 
@@ -55,16 +56,7 @@ Or prefix commands with `/usr/bin/` or `/bin/`.
 
 | Issue | Workaround |
 |-------|------------|
-| `exec` returns -1 | Use SSH instead (#31) |
-| `gh` not installed | `apt-get install -y gh` in sandbox (#32) |
-| PATH broken in SSH | Use full paths (#33) |
-| `--name` ignored | Use `--env` for labels (#34) |
+| `exec` returns -1 | Use SSH instead ([upstream#2283](https://github.com/daytonaio/daytona/issues/2283)) |
+| `gh` not installed | `apt-get install -y gh` in sandbox |
+| PATH broken in SSH | Use full paths |
 
-## First-Time Setup
-
-Create snapshot once (takes ~3 min):
-```bash
-bun run packages/cli/src/core/create-snapshot.ts
-```
-
-This installs Bun, TypeScript, and Claude Agent SDK.

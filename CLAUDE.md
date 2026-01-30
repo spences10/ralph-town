@@ -14,70 +14,50 @@ tool gives each teammate their own Daytona sandbox instead.
 
 1. Set `GH_TOKEN` in `.env` (for teammates to push/PR)
 
-2. **Run preflight check** before spawning teammates:
-   ```bash
-   source .env
-   bun run packages/cli/src/index.ts sandbox preflight
-   ```
-   This verifies gh, git, bun, curl are installed in snapshot.
-
-3. If preflight fails, rebuild snapshot:
-   ```bash
-   bun run packages/cli/src/core/create-snapshot.ts --force
-   ```
-
-### CRITICAL: Sandbox SSH Gotchas
-
-1. **Work dir is `/home/daytona`** - NOT `/workspaces`
-2. **PATH is broken** - MUST use full paths:
-   - `/usr/bin/git` not `git`
-   - `/bin/ls` not `ls`
-   - `/usr/bin/gh` not `gh`
-3. **GH_TOKEN works** - `$GH_TOKEN` is available if passed via `--env`
-
 ### Per-Teammate Flow
-
-**CRITICAL: Always use --snapshot flag. Never omit it.**
 
 ```bash
 # IMPORTANT: Source .env first so $GH_TOKEN expands
 source .env
 
-# 1. Create sandbox FROM SNAPSHOT with git token
-#    ⚠️  --snapshot ralph-town-dev is REQUIRED
-ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+# 1. Create sandbox with git token (no snapshot needed)
+ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
 # Returns sandbox ID
 
-# 2. Get SSH credentials
-ralph-town sandbox ssh <sandbox-id>
-# Returns: ssh <token>@ssh.app.daytona.io
+# 2. Install gh CLI in sandbox at runtime
+curl -sL https://github.com/cli/cli/releases/download/v2.65.0/gh_2.65.0_linux_amd64.tar.gz | tar -xz -C /tmp && mkdir -p ~/bin && mv /tmp/gh_*/bin/gh ~/bin/
 
-# 3. Teammate works in sandbox (USE FULL PATHS!):
+# 3. Teammate works in sandbox:
 #    cd /home/daytona
-#    /usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+#    git clone https://$GH_TOKEN@github.com/owner/repo.git
 #    cd repo
-#    /usr/bin/git checkout -b fix/my-branch
+#    git checkout -b fix/my-branch
 #    # make changes...
-#    /usr/bin/git add -A
-#    /usr/bin/git commit -m "message"
-#    /usr/bin/git push -u origin fix/my-branch
-#    /usr/bin/gh pr create --title "title" --body "body"
+#    git add -A
+#    git commit -m "message"
+#    git push -u origin fix/my-branch
+#    ~/bin/gh pr create --title "title" --body "body"
 
 # 4. Delete sandbox when done
 ralph-town sandbox delete <sandbox-id>
 ```
 
+### SSH Debugging Gotchas
+
+When debugging via SSH, note:
+1. **Work dir is `/home/daytona`** - NOT `/workspaces`
+2. **PATH may be broken** - use full paths if needed:
+   - `/usr/bin/git` not `git`
+   - `/bin/ls` not `ls`
+3. **GH_TOKEN works** - `$GH_TOKEN` is available if passed via `--env`
+
 ### Common Mistakes
 
-1. **Missing --snapshot flag** - creates empty sandbox without tools
-   - BAD:  `sandbox create --json`
-   - GOOD: `sandbox create --snapshot ralph-town-dev --json`
-
-2. **GH_TOKEN not expanded** - must source .env first
+1. **GH_TOKEN not expanded** - must source .env first
    - BAD:  `sandbox create --env "GH_TOKEN=$GH_TOKEN"` (without source)
    - GOOD: `source .env && sandbox create --env "GH_TOKEN=$GH_TOKEN"`
 
-3. **Stale snapshot** - gh CLI missing, run preflight to check
+2. **gh CLI not installed** - must install at runtime (see workflow above)
 
 ### PR Best Practices
 
@@ -90,7 +70,7 @@ ralph-town sandbox delete <sandbox-id>
 - **Work dir is `/home/daytona`** - not /workspaces
 - `sandbox exec` returns -1 (use SSH instead) - #31
 - `--name` flag doesn't set display name - #34
-- gh CLI may be missing - rebuild snapshot if so
+- **executeCommand returns -1 on snapshots** - [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
 
 ## Code Style
 

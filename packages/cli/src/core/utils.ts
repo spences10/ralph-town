@@ -83,13 +83,17 @@ export function is_task_complete(text: string): boolean {
  * @param value - String value from CLI arg
  * @param flag_name - Flag name for error message
  * @param default_value - Default if value is undefined
+ * @param min - Optional minimum value
+ * @param max - Optional maximum value
  * @returns Parsed integer
- * @throws Error if value is not a valid integer
+ * @throws Error if value is not a valid integer or outside range
  */
 export function parse_int_flag(
 	value: string | undefined,
 	flag_name: string,
 	default_value: number,
+	min?: number,
+	max?: number,
 ): number {
 	if (value === undefined) {
 		return default_value;
@@ -99,6 +103,12 @@ export function parse_int_flag(
 		throw new Error(
 			`Invalid value for --${flag_name}: "${value}" is not a number`,
 		);
+	}
+	if (min !== undefined && parsed < min) {
+		throw new Error(`--${flag_name} must be >= ${min}`);
+	}
+	if (max !== undefined && parsed > max) {
+		throw new Error(`--${flag_name} must be <= ${max}`);
 	}
 	return parsed;
 }

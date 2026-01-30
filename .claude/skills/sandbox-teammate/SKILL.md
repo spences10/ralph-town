@@ -1,36 +1,41 @@
 # Sandbox Teammate Instructions
 
 **DO NOT** check if GH_TOKEN exists. **DO NOT** try workarounds.
-**JUST RUN THESE EXACT COMMANDS.**
+**JUST RUN THESE EXACT COMMANDS** via SDK executeCommand.
 
-## Setup (copy-paste exactly)
+## Install gh CLI First
 
 ```bash
-cd /home/daytona
-/usr/bin/git clone https://$GH_TOKEN@github.com/spences10/ralph-town.git
+curl -sL https://github.com/cli/cli/releases/download/v2.65.0/gh_2.65.0_linux_amd64.tar.gz | tar -xz -C /tmp && mkdir -p ~/bin && mv /tmp/gh_*/bin/gh ~/bin/
+```
+
+## Setup
+
+```bash
+git clone https://$GH_TOKEN@github.com/spences10/ralph-town.git
 cd ralph-town
 ```
 
 ## Create Branch
 
 ```bash
-/usr/bin/git checkout -b fix/your-branch-name
+git checkout -b fix/your-branch-name
 ```
 
 ## After Making Changes
 
 ```bash
-/usr/bin/git add -A
-/usr/bin/git commit -m "your message
+git add -A
+git commit -m "your message
 
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
-/usr/bin/git push -u origin fix/your-branch-name
-/usr/bin/gh pr create --title "your title" --body "Fixes #N"
+git push -u origin fix/your-branch-name
+~/bin/gh pr create --title "your title" --body "Fixes #N"
 ```
 
 ## CRITICAL RULES
 
-1. **ALWAYS use full paths** - `/usr/bin/git` not `git`
-2. **Work dir is `/home/daytona`** - not /workspaces
+1. **Use SDK executeCommand** - not SSH
+2. **Install gh first** - snapshot may not have it
 3. **GH_TOKEN is available** - don't check, just use it
 4. **Don't run `which` or `echo $VAR`** - wastes time

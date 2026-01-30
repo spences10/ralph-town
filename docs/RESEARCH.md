@@ -66,6 +66,19 @@ The `@daytonaio/sdk` provides:
 - `sandbox.createSshAccess()` - Get SSH credentials
 - `sandbox.delete()` - Cleanup
 
+### 5. executeCommand Limitation on Snapshots
+
+**Critical finding**: `executeCommand()` returns -1 on snapshot-based
+sandboxes. This is a known upstream issue.
+
+| Type | Creation | executeCommand |
+|------|----------|----------------|
+| Default | ~500ms | Works |
+| Snapshot | ~1.8s | Broken (-1) |
+
+**Recommended approach**: Use default sandbox + runtime tool install
+instead of snapshots when executeCommand is needed. SSH works on both.
+
 ---
 
 ## Architecture
@@ -232,6 +245,17 @@ Default sandbox specs:
 - **Disk**: 3 GB
 - **Auto-stop**: 15 minutes idle
 - **Auto-archive**: 7 days
+
+---
+
+## Upstream Issues
+
+Daytona issues affecting this project:
+
+- [#2283](https://github.com/daytonaio/daytona/issues/2283) -
+  executeCommand returns -1 on snapshot sandboxes
+- [#2535](https://github.com/daytonaio/daytona/issues/2535) -
+  Snapshot DX improvements
 
 ---
 
