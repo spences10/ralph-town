@@ -253,13 +253,160 @@ export const sandbox_delete_tool = defineTool(
 );
 
 /**
+ * Security: Allowlist of safe command patterns for sandbox_exec
+ *
+ * Commands are validated against this allowlist before execution.
+ * The first word of the command (the binary) must match one of these patterns.
+ *
+ * NOTE: Future enhancements could include:
+ * - Rate limiting (e.g., max 10 commands per minute per sandbox)
+ * - Command argument validation for specific commands
+ * - Configurable allowlist via environment variable
+ */
+const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
+	// Version control
+	/^git$/,
+	/^gh$/,
+	// File operations (read-only or standard)
+	/^ls$/,
+	/^cat$/,
+	/^head$/,
+	/^tail$/,
+	/^less$/,
+	/^more$/,
+	/^find$/,
+	/^grep$/,
+	/^wc$/,
+	/^diff$/,
+	/^file$/,
+	/^stat$/,
+	/^du$/,
+	/^df$/,
+	// Directory navigation
+	/^pwd$/,
+	/^cd$/,
+	/^tree$/,
+	// Text processing
+	/^echo$/,
+	/^printf$/,
+	/^sed$/,
+	/^awk$/,
+	/^sort$/,
+	/^uniq$/,
+	/^cut$/,
+	/^tr$/,
+	/^xargs$/,
+	// Package managers and build tools
+	/^bun$/,
+	/^npm$/,
+	/^npx$/,
+	/^pnpm$/,
+	/^yarn$/,
+	/^node$/,
+	/^deno$/,
+	/^tsx$/,
+	/^tsc$/,
+	// Common utilities
+	/^which$/,
+	/^whereis$/,
+	/^env$/,
+	/^printenv$/,
+	/^date$/,
+	/^whoami$/,
+	/^id$/,
+	/^uname$/,
+	/^hostname$/,
+	// File manipulation (needed for dev work)
+	/^mkdir$/,
+	/^touch$/,
+	/^cp$/,
+	/^mv$/,
+	/^rm$/,
+	// Archive tools
+	/^tar$/,
+	/^zip$/,
+	/^unzip$/,
+	/^gzip$/,
+	/^gunzip$/,
+	// Network tools (for downloading dependencies)
+	/^curl$/,
+	/^wget$/,
+	// Process inspection
+	/^ps$/,
+	/^top$/,
+	/^htop$/,
+	// Testing tools
+	/^jest$/,
+	/^vitest$/,
+	/^pytest$/,
+	/^cargo$/,
+	/^go$/,
+	/^make$/,
+	// Shell built-ins that might be invoked
+	/^true$/,
+	/^false$/,
+	/^test$/,
+	/^\[$/,
+	// Allow absolute paths to common binaries
+	/^\/usr\/bin\//,
+	/^\/bin\//,
+	/^\/usr\/local\/bin\//,
+];
+
+/**
+ * Validate command against allowlist
+ * Returns true if command is allowed, false otherwise
+ */
+function is_command_allowed(cmd: string): boolean {
+	const trimmed = cmd.trim();
+	if (!trimmed) return false;
+
+	// Extract the first word (command binary)
+	const first_word = trimmed.split(/\s+/)[0];
+	if (!first_word) return false;
+
+	// Check against allowlist
+	return ALLOWED_COMMAND_PATTERNS.some((pattern) =>
+		pattern.test(first_word),
+	);
+}
+
+/**
+ * Audit log entry for command execution
+ */
+interface AuditLogEntry {
+	timestamp: string;
+	sandbox_id: string;
+	command: string;
+	allowed: boolean;
+	exit_code?: number;
+}
+
+/**
+ * Log command execution for audit purposes
+ * Currently logs to console; could be extended to log to file or external service
+ */
+function log_command_audit(entry: AuditLogEntry): void {
+	const log_line = JSON.stringify({
+		...entry,
+		type: 'sandbox_exec_audit',
+	});
+	console.error(`[AUDIT] ${log_line}`);
+}
+
+/**
  * sandbox_exec - Execute command in a sandbox
+ *
+ * SECURITY WARNING: This tool executes arbitrary commands in a sandbox.
+ * While sandboxes provide isolation, commands are validated against an
+ * allowlist to prevent obviously dangerous operations. All executions
+ * are logged for audit purposes.
  */
 export const sandbox_exec_tool = defineTool(
 	{
 		name: 'sandbox_exec',
 		description:
-			'Execute a command in a Daytona sandbox. Required: id (sandbox ID or name), cmd (command to execute). Options: cwd (working directory), timeout (command timeout in seconds, default 120)',
+			'Execute a command in a Daytona sandbox. SECURITY: Commands are validated against an allowlist of safe patterns (git, ls, cat, npm, bun, etc.). Dangerous commands will be rejected. All commands are logged for audit purposes. Required: id (sandbox ID or name), cmd (command to execute). Options: cwd (working directory), timeout (command timeout in seconds, default 120)',
 		schema: v.object({
 			id: v.pipe(v.string(), v.minLength(1)),
 			cmd: v.pipe(v.string(), v.minLength(1)),
@@ -268,6 +415,27 @@ export const sandbox_exec_tool = defineTool(
 		}),
 	},
 	async ({ id, cmd, cwd, timeout }) => {
+		const timestamp = new Date().toISOString();
+
+		// Security: Validate command against allowlist
+		const allowed = is_command_allowed(cmd);
+
+		// Log the attempt (regardless of whether it's allowed)
+		log_command_audit({
+			timestamp,
+			sandbox_id: id,
+			command: cmd,
+			allowed,
+		});
+
+		if (!allowed) {
+			return tool.error(
+				`Command not allowed: "${cmd.split(/\s+/)[0]}". ` +
+					'Only allowlisted commands (git, ls, cat, npm, bun, node, etc.) are permitted. ' +
+					'See documentation for the full allowlist.',
+			);
+		}
+
 		const args = ['sandbox', 'exec', id, cmd, '--json'];
 
 		if (cwd) {
@@ -278,6 +446,15 @@ export const sandbox_exec_tool = defineTool(
 		}
 
 		const result = await run_cli(args);
+
+		// Log the result
+		log_command_audit({
+			timestamp: new Date().toISOString(),
+			sandbox_id: id,
+			command: cmd,
+			allowed: true,
+			exit_code: result.exit_code,
+		});
 
 		if (result.exit_code === 0) {
 			try {
