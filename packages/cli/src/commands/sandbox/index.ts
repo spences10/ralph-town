@@ -11,6 +11,7 @@ import del from './delete.js';
 import exec from './exec.js';
 import preflight from './preflight.js';
 import snapshot from './snapshot/index.js';
+import env from './env.js';
 
 export default defineCommand({
 	meta: {
@@ -25,5 +26,6 @@ export default defineCommand({
 		exec,
 		preflight,
 		snapshot,
+		env,
 	},
 });

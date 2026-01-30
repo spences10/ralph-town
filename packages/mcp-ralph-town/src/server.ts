@@ -6,6 +6,8 @@ import {
 	sandbox_ssh_tool,
 	sandbox_delete_tool,
 	sandbox_exec_tool,
+	sandbox_env_list_tool,
+	sandbox_env_set_tool,
 } from './tools/index.js';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -34,6 +36,8 @@ export function create_server() {
 		sandbox_ssh_tool,
 		sandbox_delete_tool,
 		sandbox_exec_tool,
+		sandbox_env_list_tool,
+		sandbox_env_set_tool,
 	]);
 
 	return server;
