@@ -8,7 +8,7 @@ import {
 	create_sandbox,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
-import { parse_int_flag } from '../../core/utils.js';
+import { parse_int_flag_or_exit } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -38,7 +38,8 @@ export default defineCommand({
 		},
 		env: {
 			type: 'string',
-			description: 'Environment variables (KEY=VALUE, comma-separated or repeat flag)',
+			description:
+				'Environment variables (KEY=VALUE, comma-separated or repeat flag)',
 		},
 		json: {
 			type: 'boolean',
@@ -57,24 +58,17 @@ export default defineCommand({
 				}
 			}
 		}
-		let auto_stop: number | undefined;
-		let timeout: number | undefined;
-		try {
-			auto_stop = args['auto-stop']
-				? parse_int_flag(args['auto-stop'], 'auto-stop', 0)
-				: undefined;
-			timeout = args.timeout
-				? parse_int_flag(args.timeout, 'timeout', 120)
-				: undefined;
-		} catch (error) {
-			const msg = error instanceof Error ? error.message : String(error);
-			if (args.json) {
-				console.error(JSON.stringify({ error: msg }));
-			} else {
-				console.error('Error: ' + msg);
-			}
-			process.exit(1);
-		}
+		const auto_stop = args['auto-stop']
+			? parse_int_flag_or_exit(
+					args['auto-stop'],
+					'auto-stop',
+					0,
+					args.json,
+				)
+			: undefined;
+		const timeout = args.timeout
+			? parse_int_flag_or_exit(args.timeout, 'timeout', 120, args.json)
+			: undefined;
 
 		if (!args.json) {
 			console.log('Creating sandbox...');
@@ -87,18 +81,24 @@ export default defineCommand({
 				image: args.image,
 				auto_stop_interval: auto_stop,
 				timeout,
-				env_vars: Object.keys(env_vars).length > 0 ? env_vars : undefined,
-				on_build_log: (args.json || args.snapshot) ? undefined : (chunk) => process.stdout.write(chunk),
+				env_vars:
+					Object.keys(env_vars).length > 0 ? env_vars : undefined,
+				on_build_log:
+					args.json || args.snapshot
+						? undefined
+						: (chunk) => process.stdout.write(chunk),
 			});
 
 			const work_dir = await sandbox.get_work_dir();
 
 			if (args.json) {
-				console.log(JSON.stringify({
-					id: sandbox.id,
-					state: sandbox.state,
-					work_dir: work_dir || null,
-				}));
+				console.log(
+					JSON.stringify({
+						id: sandbox.id,
+						state: sandbox.state,
+						work_dir: work_dir || null,
+					}),
+				);
 			} else {
 				console.log('\nSandbox created successfully!');
 				console.log('ID: ' + sandbox.id);

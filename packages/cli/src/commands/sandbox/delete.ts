@@ -1,6 +1,6 @@
 /**
  * sandbox delete command
- * Delete a sandbox
+ * Delete a sandbox and clean up resources
  */
 
 import { defineCommand } from 'citty';
@@ -8,7 +8,7 @@ import {
 	create_daytona_client,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
-import { parse_int_flag } from '../../core/utils.js';
+import { parse_int_flag_or_exit } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -18,7 +18,7 @@ export default defineCommand({
 	args: {
 		id: {
 			type: 'positional',
-			description: 'Sandbox ID or name',
+			description: 'Sandbox ID to delete',
 			required: true,
 		},
 		timeout: {
@@ -46,28 +46,44 @@ export default defineCommand({
 			throw error;
 		}
 		const sandbox = await daytona.get(args.id);
-		let timeout: number;
-		try {
-			timeout = parse_int_flag(args.timeout, 'timeout', 60);
-		} catch (error) {
-			const msg = error instanceof Error ? error.message : String(error);
-			if (args.json) {
-				console.error(JSON.stringify({ error: msg }));
-			} else {
-				console.error('Error: ' + msg);
-			}
-			process.exit(1);
-		}
+		const timeout = parse_int_flag_or_exit(
+			args.timeout,
+			'timeout',
+			60,
+			args.json,
+		);
 
 		if (!args.json) {
 			console.log('Deleting sandbox ' + args.id + '...');
 		}
-		await daytona.delete(sandbox, timeout);
-		
-		if (args.json) {
-			console.log(JSON.stringify({ id: args.id, deleted: true }));
-		} else {
-			console.log('Sandbox deleted successfully.');
+
+		try {
+			await sandbox.delete(timeout);
+
+			if (args.json) {
+				console.log(
+					JSON.stringify({
+						deleted: true,
+						id: args.id,
+					}),
+				);
+			} else {
+				console.log('Sandbox deleted successfully');
+			}
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : 'Unknown error';
+			if (args.json) {
+				console.error(
+					JSON.stringify({
+						error: message,
+						id: args.id,
+					}),
+				);
+			} else {
+				console.error('Error deleting sandbox: ' + message);
+			}
+			process.exit(1);
 		}
 	},
 });
