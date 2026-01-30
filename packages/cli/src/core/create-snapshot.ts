@@ -2,7 +2,7 @@
  * Create the ralph-town-dev snapshot with Bun + Claude Agent SDK pre-installed
  *
  * Run once to create the snapshot, then use it for fast sandbox creation.
- * Usage: bun src/create-snapshot.ts
+ * Usage: bun src/create-snapshot.ts [--force]
  */
 
 import { Daytona, Image } from '@daytonaio/sdk';
@@ -11,6 +11,7 @@ import 'dotenv/config';
 const SNAPSHOT_NAME = 'ralph-town-dev';
 
 async function create_snapshot(): Promise<void> {
+	const force = process.argv.includes('--force');
 	console.log(`Creating snapshot: ${SNAPSHOT_NAME}\n`);
 
 	const daytona = new Daytona();
@@ -18,9 +19,20 @@ async function create_snapshot(): Promise<void> {
 	// Check if snapshot already exists
 	try {
 		const existing = await daytona.snapshot.get(SNAPSHOT_NAME);
-		console.log(`Snapshot already exists (state: ${existing.state})`);
-		console.log('Delete it first if you want to recreate.');
-		return;
+		if (force) {
+			console.log(
+				`Snapshot exists (state: ${existing.state}), deleting...`,
+			);
+			await daytona.snapshot.delete(existing);
+			// Wait for deletion to propagate
+			console.log('Waiting for deletion to complete...');
+			await new Promise((resolve) => setTimeout(resolve, 5000));
+			console.log('Deleted existing snapshot.\n');
+		} else {
+			console.log(`Snapshot already exists (state: ${existing.state})`);
+			console.log('Use --force to delete and recreate.');
+			return;
+		}
 	} catch {
 		// Snapshot doesn't exist, continue
 	}
