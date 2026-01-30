@@ -14,32 +14,28 @@ tool gives each teammate their own Daytona sandbox instead.
 
 1. Set `GH_TOKEN` in `.env` (for teammates to push/PR)
 
-2. **Preflight check** - verify snapshot before spawning teammates:
+2. **Run preflight check** before spawning teammates:
    ```bash
    source .env
-   # Create test sandbox
-   bun run packages/cli/src/index.ts sandbox create --snapshot ralph-town-dev --json
-   # Get SSH and verify tools exist
-   bun run packages/cli/src/index.ts sandbox ssh <id> --json
-   ssh <token>@ssh.app.daytona.io "which gh && which git && bun --version"
-   # Delete test sandbox
-   bun run packages/cli/src/index.ts sandbox delete <id>
+   bun run packages/cli/src/index.ts sandbox preflight
    ```
+   This verifies gh, git, bun, curl are installed in snapshot.
 
-3. If tools missing, rebuild snapshot:
+3. If preflight fails, rebuild snapshot:
    ```bash
-   bun run packages/cli/src/core/create-snapshot.ts
+   bun run packages/cli/src/core/create-snapshot.ts --force
    ```
-
-**Required tools in snapshot:** gh, git, bun, curl
 
 ### Per-Teammate Flow
+
+**CRITICAL: Always use --snapshot flag. Never omit it.**
 
 ```bash
 # IMPORTANT: Source .env first so $GH_TOKEN expands
 source .env
 
-# 1. Create sandbox from snapshot with git token
+# 1. Create sandbox FROM SNAPSHOT with git token
+#    ⚠️  --snapshot ralph-town-dev is REQUIRED
 ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 # Returns sandbox ID
 
@@ -56,6 +52,18 @@ ralph-town sandbox ssh <sandbox-id>
 ralph-town sandbox delete <sandbox-id>
 ```
 
+### Common Mistakes
+
+1. **Missing --snapshot flag** - creates empty sandbox without tools
+   - BAD:  `sandbox create --json`
+   - GOOD: `sandbox create --snapshot ralph-town-dev --json`
+
+2. **GH_TOKEN not expanded** - must source .env first
+   - BAD:  `sandbox create --env "GH_TOKEN=$GH_TOKEN"` (without source)
+   - GOOD: `source .env && sandbox create --env "GH_TOKEN=$GH_TOKEN"`
+
+3. **Stale snapshot** - gh CLI missing, run preflight to check
+
 ### PR Best Practices
 
 - Include `Fixes #N` in PR body to auto-close issues on merge
@@ -66,15 +74,6 @@ ralph-town sandbox delete <sandbox-id>
 - `sandbox exec` returns -1 (use SSH instead) - #31
 - SSH PATH broken, use full paths: `/usr/bin/git` - #33
 - `--name` flag doesn't set display name - #34
-
-### Rebuilding Snapshot
-
-After updating `create-snapshot.ts`, rebuild:
-```bash
-bun run packages/cli/src/core/create-snapshot.ts
-```
-
-Current snapshot may be stale - if gh CLI missing, rebuild.
 
 ## Code Style
 

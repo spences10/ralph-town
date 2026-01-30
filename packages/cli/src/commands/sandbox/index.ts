@@ -9,6 +9,7 @@ import ssh from './ssh.js';
 import list from './list.js';
 import del from './delete.js';
 import exec from './exec.js';
+import preflight from './preflight.js';
 
 export default defineCommand({
 	meta: {
@@ -21,5 +22,6 @@ export default defineCommand({
 		list,
 		delete: del,
 		exec,
+		preflight,
 	},
 });
