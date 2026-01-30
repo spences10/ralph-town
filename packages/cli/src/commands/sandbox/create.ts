@@ -3,12 +3,25 @@
  * Create a new Daytona sandbox with pre-baked image
  */
 
+import * as fs from 'fs';
 import { defineCommand } from 'citty';
 import {
 	create_sandbox,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
+
+function parse_env_file(path: string): Record<string, string> {
+	const content = fs.readFileSync(path, 'utf-8');
+	const env: Record<string, string> = {};
+	for (const line of content.split('\n')) {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith('#')) continue;
+		const [key, ...rest] = trimmed.split('=');
+		if (key) env[key] = rest.join('=');
+	}
+	return env;
+}
 
 export default defineCommand({
 	meta: {
@@ -36,6 +49,10 @@ export default defineCommand({
 			type: 'string',
 			description: 'Creation timeout in seconds (default: 120)',
 		},
+		'env-file': {
+			type: 'string',
+			description: 'Path to .env file',
+		},
 		env: {
 			type: 'string',
 			description:
@@ -47,8 +64,23 @@ export default defineCommand({
 		},
 	},
 	async run({ args }) {
-		// Parse env vars from --env flag
-		const env_vars: Record<string, string> = {};
+		// Parse env vars from --env-file first
+		let env_vars: Record<string, string> = {};
+		if (args['env-file']) {
+			try {
+				env_vars = parse_env_file(args['env-file']);
+			} catch (error) {
+				const msg = `Failed to read env file: ${args['env-file']}`;
+				if (args.json) {
+					console.error(JSON.stringify({ error: msg }));
+				} else {
+					console.error('Error: ' + msg);
+				}
+				process.exit(1);
+			}
+		}
+
+		// Parse env vars from --env flag (takes precedence over file)
 		if (args.env) {
 			const parts = args.env.split(',');
 			for (const part of parts) {
