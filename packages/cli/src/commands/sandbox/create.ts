@@ -8,6 +8,7 @@ import {
 	create_sandbox,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
+import { parse_int_flag } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -56,10 +57,24 @@ export default defineCommand({
 				}
 			}
 		}
-		const auto_stop = args['auto-stop']
-			? parseInt(args['auto-stop'], 10)
-			: undefined;
-		const timeout = args.timeout ? parseInt(args.timeout, 10) : undefined;
+		let auto_stop: number | undefined;
+		let timeout: number | undefined;
+		try {
+			auto_stop = args['auto-stop']
+				? parse_int_flag(args['auto-stop'], 'auto-stop', 0)
+				: undefined;
+			timeout = args.timeout
+				? parse_int_flag(args.timeout, 'timeout', 120)
+				: undefined;
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			if (args.json) {
+				console.error(JSON.stringify({ error: msg }));
+			} else {
+				console.error('Error: ' + msg);
+			}
+			process.exit(1);
+		}
 
 		if (!args.json) {
 			console.log('Creating sandbox...');

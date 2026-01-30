@@ -8,6 +8,7 @@ import {
 	create_daytona_client,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
+import { parse_int_flag } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -35,7 +36,18 @@ export default defineCommand({
 			}
 			throw error;
 		}
-		const limit = args.limit ? parseInt(args.limit, 10) : 20;
+		let limit: number;
+		try {
+			limit = parse_int_flag(args.limit, 'limit', 20);
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			if (args.json) {
+				console.error(JSON.stringify({ error: msg }));
+			} else {
+				console.error('Error: ' + msg);
+			}
+			process.exit(1);
+		}
 
 		const result = await daytona.list(undefined, 1, limit);
 

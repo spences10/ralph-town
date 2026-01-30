@@ -8,6 +8,7 @@ import {
 	create_daytona_client,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
+import { parse_int_flag } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -50,7 +51,18 @@ export default defineCommand({
 			throw error;
 		}
 		const sandbox = await daytona.get(args.id);
-		const timeout_sec = args.timeout ? parseInt(args.timeout, 10) : 120;
+		let timeout_sec: number;
+		try {
+			timeout_sec = parse_int_flag(args.timeout, 'timeout', 120);
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			if (args.json) {
+				console.error(JSON.stringify({ error: msg }));
+			} else {
+				console.error('Error: ' + msg);
+			}
+			process.exit(1);
+		}
 
 		const result = await sandbox.process.executeCommand(
 			args.cmd,

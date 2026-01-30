@@ -83,3 +83,28 @@ export function extract_developer_tasks(text: string): string[] {
 export function is_task_complete(text: string): boolean {
 	return text.includes('TASK_COMPLETE');
 }
+
+/**
+ * Parse and validate numeric CLI flag
+ * @param value - String value from CLI arg
+ * @param flag_name - Flag name for error message
+ * @param default_value - Default if value is undefined
+ * @returns Parsed integer
+ * @throws Error if value is not a valid integer
+ */
+export function parse_int_flag(
+	value: string | undefined,
+	flag_name: string,
+	default_value: number,
+): number {
+	if (value === undefined) {
+		return default_value;
+	}
+	const parsed = parseInt(value, 10);
+	if (Number.isNaN(parsed)) {
+		throw new Error(
+			`Invalid value for --${flag_name}: "${value}" is not a number`,
+		);
+	}
+	return parsed;
+}

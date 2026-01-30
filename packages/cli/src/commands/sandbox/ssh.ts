@@ -8,6 +8,7 @@ import {
 	create_daytona_client,
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
+import { parse_int_flag } from '../../core/utils.js';
 
 function mask_token(token: string): string {
 	if (token.length <= 4) return '****';
@@ -47,9 +48,18 @@ export default defineCommand({
 		}
 		const sandbox = await daytona.get(args.id);
 
-		const expires_minutes = args.expires
-			? parseInt(args.expires, 10)
-			: 60;
+		let expires_minutes: number;
+		try {
+			expires_minutes = parse_int_flag(args.expires, 'expires', 60);
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			if (args.json) {
+				console.error(JSON.stringify({ error: msg }));
+			} else {
+				console.error('Error: ' + msg);
+			}
+			process.exit(1);
+		}
 
 		const access = await sandbox.createSshAccess(expires_minutes);
 
