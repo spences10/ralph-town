@@ -41,7 +41,8 @@ export default defineCommand({
 				} else {
 					console.error('Error: ' + error.message);
 				}
-				process.exit(1);
+				process.exitCode = 1;
+				return;
 			}
 			throw error;
 		}
@@ -83,7 +84,8 @@ export default defineCommand({
 			} else {
 				console.error('Error deleting sandbox: ' + message);
 			}
-			process.exit(1);
+			process.exitCode = 1;
+			return;
 		}
 	},
 });

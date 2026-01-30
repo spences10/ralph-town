@@ -115,3 +115,32 @@ export class Sandbox {
 
 	/**
 	 * Delete the sandbox
+	 * @param timeout - Timeout in seconds (default: 60)
+	 */
+	async delete(timeout: number = 60): Promise<void> {
+		await this.sandbox.delete(timeout);
+	}
+
+	/**
+	 * Get the working directory path
+	 * @returns Working directory path
+	 */
+	async get_work_dir(): Promise<string | undefined> {
+		return this.sandbox.getWorkDir();
+	}
+
+	/**
+	 * Get the user's home directory path
+	 * @returns Home directory path
+	 */
+	async get_home_dir(): Promise<string | undefined> {
+		return this.sandbox.getUserHomeDir();
+	}
+
+	/**
+	 * Access the underlying Daytona sandbox for advanced operations
+	 */
+	get raw(): DaytonaSandbox {
+		return this.sandbox;
+	}
+}

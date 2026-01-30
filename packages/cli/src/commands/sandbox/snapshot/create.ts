@@ -30,7 +30,7 @@ export default defineCommand({
 	async run({ args }) {
 		const snapshot_name = args.name || DEFAULT_SNAPSHOT_NAME;
 
-		if (\!args.json) {
+		if (!args.json) {
 			console.log(`Creating snapshot: ${snapshot_name}\n`);
 		}
 
@@ -40,18 +40,18 @@ export default defineCommand({
 		try {
 			const existing = await daytona.snapshot.get(snapshot_name);
 			if (args.force) {
-				if (\!args.json) {
+				if (!args.json) {
 					console.log(
 						`Snapshot exists (state: ${existing.state}), deleting...`,
 					);
 				}
 				await daytona.snapshot.delete(existing);
 				// Wait for deletion to propagate
-				if (\!args.json) {
+				if (!args.json) {
 					console.log('Waiting for deletion to complete...');
 				}
 				await new Promise((resolve) => setTimeout(resolve, 5000));
-				if (\!args.json) {
+				if (!args.json) {
 					console.log('Deleted existing snapshot.\n');
 				}
 			} else {
@@ -100,7 +100,7 @@ export default defineCommand({
 				'/root/.bun/bin/bun add @anthropic-ai/claude-agent-sdk',
 			);
 
-		if (\!args.json) {
+		if (!args.json) {
 			console.log('Building snapshot (this takes ~2-3 minutes)...\n');
 		}
 
@@ -122,7 +122,7 @@ export default defineCommand({
 					}),
 				);
 			} else {
-				console.log(`\nSnapshot created successfully\!`);
+				console.log(`\nSnapshot created successfully!`);
 				console.log(`  Name: ${snapshot.name}`);
 				console.log(`  ID: ${snapshot.id}`);
 				console.log(`  State: ${snapshot.state}`);
@@ -133,9 +133,10 @@ export default defineCommand({
 					JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
 				);
 			} else {
-				console.error('\\nFailed to create snapshot:', error);
+				console.error('\nFailed to create snapshot:', error);
 			}
-			process.exit(1);
+			process.exitCode = 1;
+			return;
 		}
 	},
 });

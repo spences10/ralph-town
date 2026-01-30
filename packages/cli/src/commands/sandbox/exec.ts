@@ -50,7 +50,8 @@ export default defineCommand({
 				} else {
 					console.error('Error: ' + error.message);
 				}
-				process.exit(1);
+				process.exitCode = 1;
+				return;
 			}
 			throw error;
 		}
@@ -81,7 +82,8 @@ export default defineCommand({
 				console.log(result.result);
 			}
 			if (result.exitCode !== 0) {
-				process.exit(result.exitCode);
+				process.exitCode = result.exitCode;
+				return;
 			}
 		}
 	},
