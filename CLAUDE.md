@@ -132,6 +132,47 @@ Infra problems are team-lead's job, not yours. Spinning wheels on
 sandbox issues wastes time when the lead could just spawn another
 teammate.
 
+## Dogfooding Checklist
+
+Steps for team-lead spawning teammates in sandboxes:
+
+### Before Spawning
+
+- [ ] Ensure `GH_TOKEN` is set in `.env`
+- [ ] Source `.env` before running commands: `source .env`
+
+### Per-Teammate Setup
+
+- [ ] Create sandbox with snapshot:
+  ```bash
+  ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+  ```
+- [ ] Get SSH command (NOT exec - it's broken on snapshots):
+  ```bash
+  ralph-town sandbox ssh <sandbox-id>
+  ```
+- [ ] Configure git credential helper in sandbox (secure, no token in URL):
+  ```bash
+  /usr/bin/git config --global credential.helper store
+  /bin/echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+  /bin/chmod 600 ~/.git-credentials
+  ```
+- [ ] Clone repo and configure git identity
+
+### During Work
+
+- [ ] Use full paths for all commands (`/usr/bin/git`, `/usr/bin/gh`)
+- [ ] Work in `/home/daytona` (not /workspaces)
+
+### After Completion
+
+- [ ] Verify PR was created successfully
+- [ ] Delete sandbox when teammate finishes:
+  ```bash
+  ralph-town sandbox delete <sandbox-id>
+  ```
+- [ ] Track sandbox IDs to ensure cleanup
+
 ## Code Style
 
 - **snake_case** for functions and variables
