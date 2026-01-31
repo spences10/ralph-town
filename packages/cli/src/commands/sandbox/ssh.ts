@@ -10,6 +10,8 @@ import {
 } from '../../sandbox/index.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
 
+const REDACTED = '***REDACTED***';
+
 function mask_token(token: string): string {
 	if (token.length <= 4) return '****';
 	return token.slice(0, 4) + '****' + token.slice(-4);
@@ -32,7 +34,11 @@ export default defineCommand({
 		},
 		json: {
 			type: 'boolean',
-			description: 'Output as JSON (includes unmasked token)',
+			description: 'Output as JSON',
+		},
+		'show-secrets': {
+			type: 'boolean',
+			description: 'Show unmasked tokens in output',
 		},
 	},
 	async run({ args }) {
@@ -61,26 +67,38 @@ export default defineCommand({
 		);
 
 		const access = await sandbox.createSshAccess(expires_minutes);
+		const show_secrets = args['show-secrets'];
 
 		if (args.json) {
+			const display_token = show_secrets ? access.token : REDACTED;
 			console.log(
 				JSON.stringify({
-					token: access.token,
-					command: 'ssh ' + access.token + '@ssh.app.daytona.io',
+					token: display_token,
+					token_masked: !show_secrets,
+					command: 'ssh ' + display_token + '@ssh.app.daytona.io',
 					expires_at: new Date(
 						Date.now() + expires_minutes * 60 * 1000,
 					).toISOString(),
 				}),
 			);
 		} else {
-			// Mask token in human-readable output to prevent accidental exposure
-			const masked = mask_token(access.token);
-			console.log('SSH Access for sandbox ' + args.id);
-			console.log('Token: ' + masked + ' (use --json for full token)');
-			console.log(
-				'Command: ssh ' + masked + '@ssh.app.daytona.io',
-			);
-			console.log('Expires in: ' + expires_minutes + ' minutes');
+			if (show_secrets) {
+				console.log('SSH Access for sandbox ' + args.id);
+				console.log('Token: ' + access.token);
+				console.log(
+					'Command: ssh ' + access.token + '@ssh.app.daytona.io',
+				);
+				console.log('Expires in: ' + expires_minutes + ' minutes');
+			} else {
+				// Mask token in human-readable output to prevent accidental exposure
+				const masked = mask_token(access.token);
+				console.log('SSH Access for sandbox ' + args.id);
+				console.log(
+					'Token: ' + masked + ' (use --show-secrets for full token)',
+				);
+				console.log('Command: ssh ' + masked + '@ssh.app.daytona.io');
+				console.log('Expires in: ' + expires_minutes + ' minutes');
+			}
 		}
 	},
 });
