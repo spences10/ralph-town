@@ -88,6 +88,18 @@ SSH sessions have broken PATH. ALWAYS use full paths:
 
 Upstream: [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
 
+## Teammate Behavior: Fail Fast
+
+If sandbox/snapshot creation fails:
+1. **Report error to team-lead immediately**
+2. DO NOT attempt workarounds (installing tools manually, etc.)
+3. DO NOT keep retrying - you're wasting tokens
+4. Team-lead will either fix the issue or spawn a replacement
+
+Infra problems are team-lead's job, not yours. Spinning wheels on
+sandbox issues wastes time when the lead could just spawn another
+teammate.
+
 ## Code Style
 
 - **snake_case** for functions and variables
