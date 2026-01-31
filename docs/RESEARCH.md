@@ -192,7 +192,6 @@ gh pr create --title "Feature X" --body "Description"
 
 ### Future Improvements
 
-- **#38**: `--env-file .env` support for easier secret passing
 - **#39**: `sandbox env set <id> KEY=VALUE` for running sandboxes
 
 ---
