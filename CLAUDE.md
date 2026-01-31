@@ -83,6 +83,26 @@ Why tokens in URLs are dangerous:
 - Exposed in git error messages
 - May appear in debug logs
 
+### CRITICAL: Env Var Visibility in Sandboxes
+
+**Env vars passed via `--env` are visible to ALL processes in the
+sandbox.** Any code running in the sandbox can read them.
+
+How env vars can be accessed:
+- `env` command lists all environment variables
+- `/proc/*/environ` exposes env vars of any process
+- Any script/binary in sandbox can read `$GH_TOKEN`
+
+**Security implications:**
+- Only pass credentials the sandbox code legitimately needs
+- Treat sandbox env vars as readable by untrusted code
+- If running untrusted code, don't pass sensitive tokens
+
+**Mitigations:**
+- Use short-lived tokens when possible
+- Scope tokens to minimum required permissions
+- Delete sandbox promptly after use
+
 ### Common Mistakes
 
 1. **Not using snapshot** - use `--snapshot ralph-town-dev`
