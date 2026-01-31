@@ -132,16 +132,14 @@ describe('is_sandbox_not_found', () => {
 
 describe('output_error', () => {
 	let errorSpy: ReturnType<typeof spyOn>;
-	let originalExitCode: number | undefined;
 
 	beforeEach(() => {
-		originalExitCode = process.exitCode;
-		process.exitCode = 0;
 		errorSpy = spyOn(console, 'error').mockImplementation(() => {});
 	});
 
 	afterEach(() => {
-		process.exitCode = originalExitCode;
+		// Reset exit code to prevent affecting test runner
+		process.exitCode = 0;
 	});
 
 	test('outputs JSON in json mode with BaseCliError', () => {
