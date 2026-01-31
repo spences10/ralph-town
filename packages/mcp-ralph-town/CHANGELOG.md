@@ -1,5 +1,13 @@
 # mcp-ralph-town
 
+## 0.0.2
+
+### Patch Changes
+
+- bfcf471: refactor to be used by Claude Code teams
+- Updated dependencies [bfcf471]
+  - ralph-town@0.0.6
+
 ## 0.0.1
 
 ### Patch Changes

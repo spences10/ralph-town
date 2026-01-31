@@ -1,6 +1,6 @@
 {
 	"name": "mcp-ralph-town",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"type": "module",
 	"description": "MCP server wrapping Ralph Loop CLI",
 	"bin": {
@@ -28,7 +28,7 @@
 		"@tmcp/adapter-valibot": "^0.1.5",
 		"@tmcp/transport-stdio": "*",
 		"valibot": "^1.2.0",
-		"ralph-town": "^0.0.5"
+		"ralph-town": "^0.0.6"
 	},
 	"devDependencies": {
 		"@types/node": "^25.0.10",

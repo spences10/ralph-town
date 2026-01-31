@@ -1,5 +1,11 @@
 # ralph-town
 
+## 0.0.6
+
+### Patch Changes
+
+- bfcf471: refactor to be used by Claude Code teams
+
 ## 0.0.5
 
 ### Patch Changes
