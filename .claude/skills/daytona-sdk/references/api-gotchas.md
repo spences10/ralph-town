@@ -11,13 +11,23 @@ When working in a sandbox via SSH:
 **JUST RUN:**
 ```bash
 cd /home/daytona
-/usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+
+# Setup credentials FIRST (secure - keeps token out of URLs/logs)
+/usr/bin/git config --global credential.helper store
+echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+
+# Clone WITHOUT token in URL
+/usr/bin/git clone https://github.com/owner/repo.git
 ```
 
 **DON'T WASTE TIME ON:**
 - `echo $GH_TOKEN` - it's there, trust it
 - `which git` - PATH is broken, use full paths
 - checking if commands exist - just run them
+
+**DON'T PUT TOKEN IN URL:**
+- BAD: `git clone https://$GH_TOKEN@github.com/...` (leaks to logs)
+- GOOD: Use credential helper as shown above
 
 ## CLI: Environment Variables Must Be Sourced
 

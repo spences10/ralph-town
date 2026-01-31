@@ -43,8 +43,12 @@ Send these instructions to the teammate:
 # Install gh CLI (required for PRs)
 curl -sL https://github.com/cli/cli/releases/download/v2.65.0/gh_2.65.0_linux_amd64.tar.gz | tar -xz -C /tmp && mkdir -p ~/bin && mv /tmp/gh_*/bin/gh ~/bin/
 
-# Clone repository with authentication
-git clone https://$GH_TOKEN@github.com/<owner>/<repo>.git
+# Configure git credential helper (SECURE - token not in URLs/logs)
+git config --global credential.helper store
+echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+
+# Clone repository (no token in URL needed)
+git clone https://github.com/<owner>/<repo>.git
 cd <repo>
 
 # Configure git identity
@@ -90,10 +94,13 @@ When assigning a teammate to work in a sandbox, send them:
 **Setup Steps:**
 1. SSH into your sandbox
 2. Install gh CLI (see command above)
-3. Clone repo: `git clone https://$GH_TOKEN@github.com/<owner>/<repo>.git`
-4. cd <repo>
-5. Configure git: `git config user.email "claude@anthropic.com" && git config user.name "Claude"`
-6. Create branch: `git checkout -b <branch-type>/<branch-name>`
+3. Configure credentials:
+   `git config --global credential.helper store`
+   `echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials`
+4. Clone repo: `git clone https://github.com/<owner>/<repo>.git`
+5. cd <repo>
+6. Configure git: `git config user.email "claude@anthropic.com" && git config user.name "Claude"`
+7. Create branch: `git checkout -b <branch-type>/<branch-name>`
 
 **After completing work:**
 - Commit, push, and create PR with gh CLI
@@ -117,5 +124,6 @@ When assigning a teammate to work in a sandbox, send them:
 | Get SSH             | `ralph-town sandbox ssh <id>`                  |
 | Delete sandbox      | `ralph-town sandbox delete <id>`               |
 | Install gh          | `curl -sL ... \| tar ... && mv ...`            |
-| Clone with auth     | `git clone https://$GH_TOKEN@github.com/...`   |
+| Setup credentials   | `git config ... && echo ... > ~/.git-credentials` |
+| Clone repo          | `git clone https://github.com/...`             |
 | Create PR           | `~/bin/gh pr create --title "..." --body "..."` |
