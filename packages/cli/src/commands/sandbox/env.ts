@@ -5,8 +5,12 @@
 
 import { defineCommand } from 'citty';
 import {
+	BaseCliError,
 	create_daytona_client,
 	is_missing_api_key_error,
+	output_error,
+	SdkError,
+	wrap_sdk_call,
 } from '../../sandbox/index.js';
 
 const list_command = defineCommand({
@@ -31,19 +35,24 @@ const list_command = defineCommand({
 			daytona = create_daytona_client();
 		} catch (error) {
 			if (is_missing_api_key_error(error)) {
-				if (args.json) {
-					console.error(JSON.stringify({ error: error.message }));
-				} else {
-					console.error('Error: ' + error.message);
-				}
-				process.exitCode = 1;
+				output_error(
+					{
+						error: true,
+						code: 'MISSING_API_KEY',
+						message: (error as Error).message,
+					},
+					!!args.json,
+				);
 				return;
 			}
 			throw error;
 		}
 
 		try {
-			const sandbox = await daytona.get(args.id);
+			const sandbox = await wrap_sdk_call(
+				() => daytona.get(args.id),
+				args.id,
+			);
 			const env = sandbox.env || {};
 
 			if (args.json) {
@@ -60,14 +69,11 @@ const list_command = defineCommand({
 				}
 			}
 		} catch (error) {
-			const msg =
-				error instanceof Error ? error.message : String(error);
-			if (args.json) {
-				console.error(JSON.stringify({ error: msg }));
-			} else {
-				console.error('Error: ' + msg);
+			if (error instanceof BaseCliError) {
+				output_error(error, !!args.json);
+				return;
 			}
-			process.exitCode = 1;
+			output_error(SdkError.from(error), !!args.json);
 		}
 	},
 });
@@ -75,7 +81,8 @@ const list_command = defineCommand({
 const set_command = defineCommand({
 	meta: {
 		name: 'set',
-		description: 'Set environment variable for a sandbox (requires restart)',
+		description:
+			'Set environment variable for a sandbox (requires restart)',
 	},
 	args: {
 		id: {
@@ -98,14 +105,15 @@ const set_command = defineCommand({
 		const env_var = args.env_var as string;
 		const eq_index = env_var.indexOf('=');
 		if (eq_index === -1) {
-			const msg =
-				'Invalid format. Use KEY=VALUE (e.g., NODE_ENV=production)';
-			if (args.json) {
-				console.error(JSON.stringify({ error: msg }));
-			} else {
-				console.error('Error: ' + msg);
-			}
-			process.exitCode = 1;
+			output_error(
+				{
+					error: true,
+					code: 'INVALID_FORMAT',
+					message:
+						'Invalid format. Use KEY=VALUE (e.g., NODE_ENV=production)',
+				},
+				!!args.json,
+			);
 			return;
 		}
 
@@ -113,13 +121,14 @@ const set_command = defineCommand({
 		const value = env_var.substring(eq_index + 1);
 
 		if (!key) {
-			const msg = 'Environment variable key cannot be empty';
-			if (args.json) {
-				console.error(JSON.stringify({ error: msg }));
-			} else {
-				console.error('Error: ' + msg);
-			}
-			process.exitCode = 1;
+			output_error(
+				{
+					error: true,
+					code: 'INVALID_KEY',
+					message: 'Environment variable key cannot be empty',
+				},
+				!!args.json,
+			);
 			return;
 		}
 
@@ -128,40 +137,43 @@ const set_command = defineCommand({
 			daytona = create_daytona_client();
 		} catch (error) {
 			if (is_missing_api_key_error(error)) {
-				if (args.json) {
-					console.error(JSON.stringify({ error: error.message }));
-				} else {
-					console.error('Error: ' + error.message);
-				}
-				process.exitCode = 1;
+				output_error(
+					{
+						error: true,
+						code: 'MISSING_API_KEY',
+						message: (error as Error).message,
+					},
+					!!args.json,
+				);
 				return;
 			}
 			throw error;
 		}
 
 		try {
-			const sandbox = await daytona.get(args.id);
+			const sandbox = await wrap_sdk_call(
+				() => daytona.get(args.id),
+				args.id,
+			);
 
 			// Note: The Daytona SDK does not provide a direct API to modify
 			// env vars on a running sandbox. Env vars are set at creation time.
 			// This command sets the env var in the current shell session only.
 			const escaped_value = value.replace(/'/g, "'\\''");
 			const cmd = 'export ' + key + "='" + escaped_value + "'";
-			const result = await sandbox.process.executeCommand(cmd);
+			const result = await wrap_sdk_call(() =>
+				sandbox.process.executeCommand(cmd),
+			);
 
 			if (result.exitCode !== 0) {
-				const msg = 'Failed to set environment variable';
-				if (args.json) {
-					console.error(
-						JSON.stringify({ error: msg, details: result.result }),
-					);
-				} else {
-					console.error('Error: ' + msg);
-					if (result.result) {
-						console.error(result.result);
-					}
-				}
-				process.exitCode = 1;
+				output_error(
+					{
+						error: true,
+						code: 'EXEC_FAILED',
+						message: 'Failed to set environment variable',
+					},
+					!!args.json,
+				);
 				return;
 			}
 
@@ -184,14 +196,11 @@ const set_command = defineCommand({
 				);
 			}
 		} catch (error) {
-			const msg =
-				error instanceof Error ? error.message : String(error);
-			if (args.json) {
-				console.error(JSON.stringify({ error: msg }));
-			} else {
-				console.error('Error: ' + msg);
+			if (error instanceof BaseCliError) {
+				output_error(error, !!args.json);
+				return;
 			}
-			process.exitCode = 1;
+			output_error(SdkError.from(error), !!args.json);
 		}
 	},
 });

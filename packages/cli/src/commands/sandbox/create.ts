@@ -6,8 +6,11 @@
 import * as fs from 'fs';
 import { defineCommand } from 'citty';
 import {
+	BaseCliError,
 	create_sandbox,
 	is_missing_api_key_error,
+	output_error,
+	SdkError,
 } from '../../sandbox/index.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
 import type { Sandbox } from '../../sandbox/index.js';
@@ -70,14 +73,15 @@ export default defineCommand({
 		if (args['env-file']) {
 			try {
 				env_vars = parse_env_file(args['env-file']);
-			} catch (error) {
-				const msg = `Failed to read env file: ${args['env-file']}`;
-				if (args.json) {
-					console.error(JSON.stringify({ error: msg }));
-				} else {
-					console.error('Error: ' + msg);
-				}
-				process.exitCode = 1;
+			} catch {
+				output_error(
+					{
+						error: true,
+						code: 'ENV_FILE_ERROR',
+						message: `Failed to read env file: ${args['env-file']}`,
+					},
+					!!args.json,
+				);
 				return;
 			}
 		}
@@ -153,15 +157,21 @@ export default defineCommand({
 			}
 
 			if (is_missing_api_key_error(error)) {
-				if (args.json) {
-					console.error(JSON.stringify({ error: error.message }));
-				} else {
-					console.error('Error: ' + error.message);
-				}
-				process.exitCode = 1;
+				output_error(
+					{
+						error: true,
+						code: 'MISSING_API_KEY',
+						message: (error as Error).message,
+					},
+					!!args.json,
+				);
 				return;
 			}
-			throw error;
+			if (error instanceof BaseCliError) {
+				output_error(error, !!args.json);
+				return;
+			}
+			output_error(SdkError.from(error), !!args.json);
 		}
 	},
 });

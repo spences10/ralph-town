@@ -5,8 +5,12 @@
 
 import { defineCommand } from 'citty';
 import {
+	BaseCliError,
 	create_daytona_client,
 	is_missing_api_key_error,
+	output_error,
+	SdkError,
+	wrap_sdk_call,
 } from '../../sandbox/index.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
 
@@ -36,17 +40,19 @@ export default defineCommand({
 			daytona = create_daytona_client();
 		} catch (error) {
 			if (is_missing_api_key_error(error)) {
-				if (args.json) {
-					console.error(JSON.stringify({ error: error.message }));
-				} else {
-					console.error('Error: ' + error.message);
-				}
-				process.exitCode = 1;
+				output_error(
+					{
+						error: true,
+						code: 'MISSING_API_KEY',
+						message: (error as Error).message,
+					},
+					!!args.json,
+				);
 				return;
 			}
 			throw error;
 		}
-		const sandbox = await daytona.get(args.id);
+
 		const timeout = parse_int_flag_or_exit(
 			args.timeout,
 			'timeout',
@@ -59,7 +65,11 @@ export default defineCommand({
 		}
 
 		try {
-			await sandbox.delete(timeout);
+			const sandbox = await wrap_sdk_call(
+				() => daytona.get(args.id),
+				args.id,
+			);
+			await wrap_sdk_call(() => sandbox.delete(timeout));
 
 			if (args.json) {
 				console.log(
@@ -72,20 +82,11 @@ export default defineCommand({
 				console.log('Sandbox deleted successfully');
 			}
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : 'Unknown error';
-			if (args.json) {
-				console.error(
-					JSON.stringify({
-						error: message,
-						id: args.id,
-					}),
-				);
-			} else {
-				console.error('Error deleting sandbox: ' + message);
+			if (error instanceof BaseCliError) {
+				output_error(error, !!args.json);
+				return;
 			}
-			process.exitCode = 1;
-			return;
+			output_error(SdkError.from(error), !!args.json);
 		}
 	},
 });
