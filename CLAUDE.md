@@ -235,6 +235,54 @@ Steps for team-lead spawning teammates in sandboxes:
   ```
 - [ ] Track sandbox IDs to ensure cleanup
 
+## Cost Awareness
+
+Daytona sandboxes have costs. Track usage to avoid surprises.
+
+### Pricing
+
+See [Daytona Pricing](https://www.daytona.io/pricing) for current
+rates.
+
+### Sandbox Specs
+
+Each sandbox created via this CLI uses:
+- **CPU:** 1 core
+- **RAM:** 1 GB
+- **Disk:** 3 GB
+
+### Auto-Management
+
+Daytona automatically manages idle sandboxes:
+- **Auto-stop:** After 15 minutes of inactivity
+- **Auto-archive:** After 7 days of being stopped
+
+### Best Practices
+
+1. **Delete sandboxes when done** - Don't rely on auto-archive
+   ```bash
+   ralph-town sandbox delete <sandbox-id>
+   ```
+
+2. **Track sandbox IDs** - Keep a list of spawned sandboxes
+   ```bash
+   # List all sandboxes
+   ralph-town sandbox list
+   ```
+
+3. **Clean up after teammates finish** - Delete immediately after
+   PR is merged or work is complete
+
+4. **Use snapshots** - Faster startup = less billable time waiting
+   for tool installation
+
+### Cost Estimation
+
+For a team session with N teammates:
+- Each teammate = 1 sandbox
+- Typical session: 30-60 minutes active
+- Remember: stopped sandboxes still consume storage until deleted
+
 ## Code Style
 
 - **snake_case** for functions and variables
