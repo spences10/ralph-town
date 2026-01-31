@@ -21,6 +21,7 @@
 	"scripts": {
 		"build": "tsc",
 		"dev": "bun src/index.ts",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
