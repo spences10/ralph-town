@@ -13,6 +13,7 @@ tool gives each teammate their own Daytona sandbox instead.
 ### Prerequisites
 
 1. Set `GH_TOKEN` in `.env` (for teammates to push/PR)
+2. Verify snapshot is ready: `ralph-town sandbox preflight`
 
 ### Per-Teammate Flow
 
@@ -86,7 +87,7 @@ Why tokens in URLs are dangerous:
 
 1. **Not using snapshot** - use `--snapshot ralph-town-dev`
    - Snapshot has gh, git, bun pre-installed
-   - Without snapshot, you'd need to install tools at runtime
+   - Without snapshot, you would need to install tools at runtime
 
 2. **Using exec instead of SSH** - exec returns -1 on snapshots
    - This is a known Daytona bug (#2283)
@@ -120,12 +121,73 @@ Why tokens in URLs are dangerous:
 
 Upstream: [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
 
+## Snapshot Management
+
+### sandbox preflight
+
+Verify snapshot has required tools before spawning teammates.
+
+```bash
+# Check default snapshot (ralph-town-dev)
+ralph-town sandbox preflight
+
+# Check specific snapshot
+ralph-town sandbox preflight --snapshot my-snapshot
+
+# JSON output for scripts
+ralph-town sandbox preflight --json
+```
+
+**Flags:**
+- `--snapshot <name>` - Snapshot to test (default: ralph-town-dev)
+- `--json` - Output as JSON
+
+**What it checks:**
+- `/usr/bin/gh` - GitHub CLI
+- `/usr/bin/git` - Git
+- `/root/.bun/bin/bun` - Bun runtime
+- `/usr/bin/curl` - curl
+
+**Use case:** Run before spawning teammates to ensure snapshot is
+properly configured. If preflight fails, rebuild the snapshot.
+
+### sandbox snapshot create
+
+Create a pre-baked snapshot with all required tools.
+
+```bash
+# Create default snapshot
+ralph-town sandbox snapshot create
+
+# Create with custom name
+ralph-town sandbox snapshot create --name my-snapshot
+
+# Force recreate existing snapshot
+ralph-town sandbox snapshot create --force
+
+# JSON output
+ralph-town sandbox snapshot create --json
+```
+
+**Flags:**
+- `--name <name>` - Snapshot name (default: ralph-town-dev)
+- `--force` - Delete existing snapshot and recreate
+- `--json` - Output as JSON
+
+**What the snapshot includes:**
+- Base image: `debian:bookworm-slim`
+- Tools: git, curl, gh CLI, bun
+- SDK: @anthropic-ai/claude-agent-sdk
+- Working dir: /home/daytona
+
+**Build time:** ~2-3 minutes
+
 ## Teammate Behavior: Fail Fast
 
 If sandbox/snapshot creation fails:
 1. **Report error to team-lead immediately**
 2. DO NOT attempt workarounds (installing tools manually, etc.)
-3. DO NOT keep retrying - you're wasting tokens
+3. DO NOT keep retrying - you are wasting tokens
 4. Team-lead will either fix the issue or spawn a replacement
 
 Infra problems are team-lead's job, not yours. Spinning wheels on

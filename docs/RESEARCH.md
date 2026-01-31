@@ -13,7 +13,7 @@ share the same filesystem. This creates problems:
 - **Collisions** - Two agents editing the same file conflict
 - **No isolation** - One agent's changes affect others
 - **Risk** - Experimental code runs on user's actual codebase
-- **No parallel branches** - Can't work on multiple features
+- **No parallel branches** - Cannot work on multiple features
   simultaneously
 
 **Solution**: Give each teammate their own Daytona sandbox.
@@ -103,7 +103,7 @@ Delete sandboxes to clean up.
 
 1. **Isolation** - Each sandbox is independent
 2. **Parallel work** - Multiple features simultaneously
-3. **Safety** - Experiments don't touch real code
+3. **Safety** - Experiments do not touch real code
 4. **Disposable** - Failed attempts just get deleted
 5. **Full environment** - Not just command execution, real shell
 
@@ -111,9 +111,11 @@ Delete sandboxes to clean up.
 
 ## CLI Commands
 
+### Core Sandbox Commands
+
 ```bash
 # Create a sandbox
-ralph-town sandbox create [--name NAME]
+ralph-town sandbox create [--name NAME] [--snapshot NAME] [--env KEY=VALUE]
 
 # Get SSH credentials
 ralph-town sandbox ssh <id> [--expires MINUTES]
@@ -128,12 +130,86 @@ ralph-town sandbox exec <id> <command>
 ralph-town sandbox delete <id>
 ```
 
+### Preflight Command
+
+Verify snapshot has required tools before spawning teammates.
+
+```bash
+# Check default snapshot (ralph-town-dev)
+ralph-town sandbox preflight
+
+# Check specific snapshot
+ralph-town sandbox preflight --snapshot my-snapshot
+
+# JSON output for scripts
+ralph-town sandbox preflight --json
+```
+
+**Flags:**
+- `--snapshot <name>` - Snapshot to test (default: ralph-town-dev)
+- `--json` - Output as JSON
+
+**Tools checked:**
+- `/usr/bin/gh` - GitHub CLI
+- `/usr/bin/git` - Git
+- `/root/.bun/bin/bun` - Bun runtime
+- `/usr/bin/curl` - curl
+
+**How it works:**
+1. Creates a temporary sandbox from the snapshot
+2. Gets SSH credentials
+3. Checks each tool exists via SSH (`/bin/test -x <path>`)
+4. Deletes the temporary sandbox
+5. Reports pass/fail
+
+**Use case:** Run before spawning teammates to catch snapshot issues
+early. If preflight fails, rebuild snapshot with `sandbox snapshot create --force`.
+
+### Snapshot Commands
+
+Create pre-baked snapshots with all required tools.
+
+```bash
+# Create default snapshot (ralph-town-dev)
+ralph-town sandbox snapshot create
+
+# Create with custom name
+ralph-town sandbox snapshot create --name my-snapshot
+
+# Force recreate existing snapshot
+ralph-town sandbox snapshot create --force
+
+# JSON output
+ralph-town sandbox snapshot create --json
+```
+
+**Flags:**
+- `--name <name>` - Snapshot name (default: ralph-town-dev)
+- `--force` - Delete existing snapshot and recreate
+- `--json` - Output as JSON
+
+**What the snapshot includes:**
+- Base image: `debian:bookworm-slim`
+- System packages: git, curl, ca-certificates
+- GitHub CLI: gh (for PR creation)
+- Bun runtime: /root/.bun/bin/bun
+- Pre-installed: @anthropic-ai/claude-agent-sdk
+- Working directory: /home/daytona
+- PATH fixes: /etc/environment, /etc/profile.d/, ~/.bashrc
+
+**Build time:** ~2-3 minutes
+
+**When to rebuild:**
+- After changing tool requirements
+- If preflight fails
+- To update SDK version
+
 ---
 
 ## Credential Workflow for Teammates
 
 Teammates in sandboxes need credentials to push code and create PRs.
-Here's how to set it up.
+Here is how to set it up.
 
 ### Passing Credentials at Sandbox Creation
 
@@ -199,8 +275,8 @@ gh pr create --title "Feature X" --body "Description"
 | Issue | Workaround |
 |-------|------------|
 | `sandbox exec` returns -1 on snapshot sandboxes | Use SSH instead |
-| SSH PATH broken (commands not found) | Use full paths: `/usr/bin/git` OR rebuild snapshot with PR #41 |
-| `gh` CLI missing | Install via apt OR rebuild snapshot with PR #44 |
+| SSH PATH broken (commands not found) | Use full paths: `/usr/bin/git` |
+| Preflight fails | Rebuild snapshot with `--force` |
 
 ### Future Improvements
 
@@ -211,15 +287,19 @@ gh pr create --title "Feature X" --body "Description"
 ## Workflow Example
 
 ```bash
-# Team lead creates sandbox for teammate
+# 1. Verify snapshot is ready
+ralph-town sandbox preflight
+# => Preflight passed!
+
+# 2. Team lead creates sandbox for teammate
 ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 # => Sandbox ID: abc123
 
-# Get SSH access
+# 3. Get SSH access
 ralph-town sandbox ssh abc123
 # => ssh xyz789@ssh.app.daytona.io
 
-# Teammate SSHs in and works
+# 4. Teammate SSHs in and works
 ssh xyz789@ssh.app.daytona.io
 > # Setup credentials (secure)
 > git config --global credential.helper store
@@ -232,7 +312,7 @@ ssh xyz789@ssh.app.daytona.io
 > git push -u origin feature/new-thing
 > gh pr create --title "Add feature" --body "Details"
 
-# Cleanup when done
+# 5. Cleanup when done
 ralph-town sandbox delete abc123
 ```
 
@@ -247,6 +327,7 @@ The MCP server exposes these tools for Claude Code:
 - `sandbox_list` - List active sandboxes
 - `sandbox_exec` - Run command in sandbox
 - `sandbox_delete` - Delete sandbox
+- `sandbox_preflight` - Verify snapshot has required tools
 
 ---
 
@@ -282,4 +363,6 @@ Daytona issues affecting this project:
 ### Internal
 - `packages/cli/src/sandbox/` - Sandbox module
 - `packages/cli/src/commands/sandbox/` - CLI commands
+- `packages/cli/src/commands/sandbox/preflight.ts` - Preflight command
+- `packages/cli/src/commands/sandbox/snapshot/` - Snapshot commands
 - `packages/mcp-ralph-town/src/tools/sandbox.ts` - MCP tools
