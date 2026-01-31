@@ -8,6 +8,17 @@ teams to work in isolated environments.
 When you spawn teammates, they normally share your filesystem. This
 tool gives each teammate their own Daytona sandbox instead.
 
+## Prerequisites
+
+Before using ralph-town, you need:
+
+1. **Daytona account** - Sign up at https://app.daytona.io
+2. **DAYTONA_API_KEY** - Get from https://app.daytona.io/dashboard/keys
+   - Add to `.env`: `DAYTONA_API_KEY=your-key-here`
+3. **GH_TOKEN** - GitHub PAT with `repo` scope
+   - Create at https://github.com/settings/tokens
+   - Add to `.env`: `GH_TOKEN=your-token-here`
+
 ## Teammate Sandbox Workflow
 
 ### Prerequisites
@@ -17,28 +28,43 @@ tool gives each teammate their own Daytona sandbox instead.
 
 ### Per-Teammate Flow
 
+**IMPORTANT:** Team-lead sets up git credentials BEFORE spawning
+teammate. The `$GH_TOKEN` variable doesn't propagate to SSH sessions,
+so credentials must be configured via SSH with local expansion.
+
+#### Team-Lead Setup (before spawning teammate)
+
 ```bash
-# IMPORTANT: Source .env first so $GH_TOKEN expands
+# Source .env so $GH_TOKEN is available locally
 source .env
 
-# 1. Create sandbox FROM SNAPSHOT (has gh, git, bun pre-installed)
-ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+# 1. Create sandbox
+ralph-town sandbox create --snapshot ralph-town-dev
 # Returns sandbox ID
 
-# 2. Get SSH access (exec returns -1 on snapshots, use SSH)
-ralph-town sandbox ssh <sandbox-id>
+# 2. Get SSH token
+ralph-town sandbox ssh <sandbox-id> --show-secrets
 # Returns: ssh <token>@ssh.app.daytona.io
 
-# 3. SSH in and work (USE FULL PATHS - PATH is broken)
+# 3. Configure git credentials VIA SSH (note the quoting!)
+# The $GH_TOKEN expands LOCALLY before being sent to remote
+ssh <token>@ssh.app.daytona.io "
+  /usr/bin/git config --global credential.helper store &&
+  /bin/echo 'https://oauth2:$GH_TOKEN@github.com' > ~/.git-credentials &&
+  /bin/chmod 600 ~/.git-credentials
+"
+
+# 4. Now spawn teammate with sandbox ID
+```
+
+#### Teammate Work (credentials already configured)
+
+```bash
+# SSH in (USE FULL PATHS - PATH is broken)
 ssh <token>@ssh.app.daytona.io
 cd /home/daytona
 
-# Configure git credential helper (SECURE - token not in URL/logs)
-/usr/bin/git config --global credential.helper store
-/bin/echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
-/bin/chmod 600 ~/.git-credentials
-
-# Clone WITHOUT token in URL
+# Clone - credentials already configured by team-lead
 /usr/bin/git clone https://github.com/owner/repo.git
 cd repo
 /usr/bin/git config user.email "teammate@example.com"
@@ -49,8 +75,11 @@ cd repo
 /usr/bin/git commit -m "message"
 /usr/bin/git push -u origin fix/my-branch
 /usr/bin/gh pr create --title "title" --body "Fixes #N"
+```
 
-# 4. Delete sandbox when done
+#### Team-Lead Cleanup
+
+```bash
 ralph-town sandbox delete <sandbox-id>
 ```
 
@@ -83,6 +112,26 @@ Why tokens in URLs are dangerous:
 - Exposed in git error messages
 - May appear in debug logs
 
+### CRITICAL: Env Var Visibility in Sandboxes
+
+**Env vars passed via `--env` are visible to ALL processes in the
+sandbox.** Any code running in the sandbox can read them.
+
+How env vars can be accessed:
+- `env` command lists all environment variables
+- `/proc/*/environ` exposes env vars of any process
+- Any script/binary in sandbox can read `$GH_TOKEN`
+
+**Security implications:**
+- Only pass credentials the sandbox code legitimately needs
+- Treat sandbox env vars as readable by untrusted code
+- If running untrusted code, don't pass sensitive tokens
+
+**Mitigations:**
+- Use short-lived tokens when possible
+- Scope tokens to minimum required permissions
+- Delete sandbox promptly after use
+
 ### Common Mistakes
 
 1. **Not using snapshot** - use `--snapshot ralph-town-dev`
@@ -97,11 +146,18 @@ Why tokens in URLs are dangerous:
    - BAD: `git clone ...`
    - GOOD: `/usr/bin/git clone ...`
 
-4. **GH_TOKEN not expanded** - must source .env first
-   - BAD: `sandbox create --env "GH_TOKEN=$GH_TOKEN"` (without source)
-   - GOOD: `source .env && sandbox create --env "GH_TOKEN=$GH_TOKEN"`
+4. **Teammate trying to set up credentials** - team-lead must do this
+   - SSH sessions don't inherit `--env` vars from sandbox creation
+   - Team-lead configures credentials via SSH BEFORE spawning teammate
+   - Teammate just clones and works - credentials already there
 
-5. **Token in git URL** - leaks to logs/process list
+5. **Wrong quoting for $GH_TOKEN in SSH** - variable won't expand
+   - BAD: `ssh ... '/bin/echo "https://oauth2:$GH_TOKEN@..."'`
+     (single quotes prevent expansion)
+   - GOOD: `ssh ... "/bin/echo 'https://oauth2:$GH_TOKEN@...'"`
+     (double quotes allow local expansion)
+
+6. **Token in git URL** - leaks to logs/process list
    - BAD: `git clone https://$GH_TOKEN@github.com/...`
    - GOOD: Use credential helper (see workflow above)
 
@@ -118,6 +174,7 @@ Why tokens in URLs are dangerous:
 | `exec` returns -1 on snapshots | Use SSH instead |
 | Work dir is `/home/daytona` | Not /workspaces |
 | SSH exit code 255 | Ignore - check output, not exit code |
+| `--env` vars not in SSH | Team-lead sets credentials before spawning |
 
 Upstream: [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
 
@@ -203,28 +260,34 @@ Steps for team-lead spawning teammates in sandboxes:
 - [ ] Ensure `GH_TOKEN` is set in `.env`
 - [ ] Source `.env` before running commands: `source .env`
 
-### Per-Teammate Setup
+### Per-Teammate Setup (Team-Lead Does This)
 
 - [ ] Create sandbox with snapshot:
   ```bash
-  ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+  ralph-town sandbox create --snapshot ralph-town-dev
   ```
-- [ ] Get SSH command (NOT exec - it's broken on snapshots):
+- [ ] Get SSH token:
   ```bash
-  ralph-town sandbox ssh <sandbox-id>
+  ralph-town sandbox ssh <sandbox-id> --show-secrets
   ```
-- [ ] Configure git credential helper in sandbox (secure, no token in URL):
+- [ ] Configure git credentials via SSH (BEFORE spawning teammate):
   ```bash
-  /usr/bin/git config --global credential.helper store
-  /bin/echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
-  /bin/chmod 600 ~/.git-credentials
+  ssh <token>@ssh.app.daytona.io "
+    /usr/bin/git config --global credential.helper store &&
+    /bin/echo 'https://oauth2:$GH_TOKEN@github.com' > ~/.git-credentials &&
+    /bin/chmod 600 ~/.git-credentials
+  "
   ```
-- [ ] Clone repo and configure git identity
+  **NOTE:** The `$GH_TOKEN` expands LOCALLY (from your sourced .env),
+  not on the remote. This is intentional - SSH sessions don't inherit
+  sandbox env vars.
+- [ ] Spawn teammate with sandbox ID and SSH token
 
-### During Work
+### During Work (Teammate Does This)
 
 - [ ] Use full paths for all commands (`/usr/bin/git`, `/usr/bin/gh`)
 - [ ] Work in `/home/daytona` (not /workspaces)
+- [ ] Git credentials already configured - just clone and push
 
 ### After Completion
 
@@ -234,6 +297,54 @@ Steps for team-lead spawning teammates in sandboxes:
   ralph-town sandbox delete <sandbox-id>
   ```
 - [ ] Track sandbox IDs to ensure cleanup
+
+## Cost Awareness
+
+Daytona sandboxes have costs. Track usage to avoid surprises.
+
+### Pricing
+
+See [Daytona Pricing](https://www.daytona.io/pricing) for current
+rates.
+
+### Sandbox Specs
+
+Each sandbox created via this CLI uses:
+- **CPU:** 1 core
+- **RAM:** 1 GB
+- **Disk:** 3 GB
+
+### Auto-Management
+
+Daytona automatically manages idle sandboxes:
+- **Auto-stop:** After 15 minutes of inactivity
+- **Auto-archive:** After 7 days of being stopped
+
+### Best Practices
+
+1. **Delete sandboxes when done** - Don't rely on auto-archive
+   ```bash
+   ralph-town sandbox delete <sandbox-id>
+   ```
+
+2. **Track sandbox IDs** - Keep a list of spawned sandboxes
+   ```bash
+   # List all sandboxes
+   ralph-town sandbox list
+   ```
+
+3. **Clean up after teammates finish** - Delete immediately after
+   PR is merged or work is complete
+
+4. **Use snapshots** - Faster startup = less billable time waiting
+   for tool installation
+
+### Cost Estimation
+
+For a team session with N teammates:
+- Each teammate = 1 sandbox
+- Typical session: 30-60 minutes active
+- Remember: stopped sandboxes still consume storage until deleted
 
 ## Code Style
 

@@ -22,6 +22,9 @@ export { Sandbox } from './sandbox.js';
 export type {
 	CreateSandboxOptions,
 	ExecuteResult,
+	ISandbox,
+	SandboxProvider,
+	SandboxSummary,
 	SshAccess,
 } from './types.js';
 export {

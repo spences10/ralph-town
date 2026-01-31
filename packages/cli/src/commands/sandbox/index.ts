@@ -12,6 +12,7 @@ import exec from './exec.js';
 import preflight from './preflight.js';
 import snapshot from './snapshot/index.js';
 import env from './env.js';
+import health from './health.js';
 
 export default defineCommand({
 	meta: {
@@ -27,5 +28,6 @@ export default defineCommand({
 		preflight,
 		snapshot,
 		env,
+		health,
 	},
 });

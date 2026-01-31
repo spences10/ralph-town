@@ -6,7 +6,11 @@
 import type { Sandbox as DaytonaSandbox } from '@daytonaio/sdk';
 import type { Daytona } from '@daytonaio/sdk';
 import { with_retry } from './errors.js';
-import type { ExecuteResult, SshAccess } from './types.js';
+import type {
+	ExecuteResult,
+	ISandbox,
+	SshAccess,
+} from './types.js';
 
 /** Default SSH access expiration in minutes */
 const DEFAULT_SSH_EXPIRES_MINUTES = 60;
@@ -17,8 +21,9 @@ const DEFAULT_COMMAND_TIMEOUT = 120;
 /**
  * Sandbox instance wrapper
  * Provides convenient methods for interacting with a Daytona sandbox
+ * Implements ISandbox interface for provider compatibility
  */
-export class Sandbox {
+export class Sandbox implements ISandbox {
 	private readonly daytona: Daytona;
 	private readonly sandbox: DaytonaSandbox;
 

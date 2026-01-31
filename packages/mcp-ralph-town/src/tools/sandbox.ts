@@ -24,7 +24,11 @@ function get_cli_path(): string {
 }
 
 const cli_path = get_cli_path();
-const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
+
+// Per-tool timeout constants
+const QUICK_TIMEOUT_MS = 30000; // 30 seconds for quick ops (list, ssh, delete)
+const DEFAULT_TIMEOUT_MS = 120000; // 2 minutes for standard ops (create, exec)
+const LONG_TIMEOUT_MS = 300000; // 5 minutes for snapshot operations
 
 /**
  * Execute CLI command and return result
@@ -125,7 +129,7 @@ export const sandbox_create_tool = defineTool(
 			}
 		}
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, DEFAULT_TIMEOUT_MS);
 
 		if (result.exit_code === 0) {
 			try {
@@ -161,7 +165,7 @@ export const sandbox_list_tool = defineTool(
 			args.push('--limit', String(limit));
 		}
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, QUICK_TIMEOUT_MS);
 
 		if (result.exit_code === 0) {
 			try {
@@ -198,7 +202,7 @@ export const sandbox_ssh_tool = defineTool(
 			args.push('--expires', String(expires));
 		}
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, QUICK_TIMEOUT_MS);
 
 		if (result.exit_code === 0) {
 			try {
@@ -235,7 +239,7 @@ export const sandbox_delete_tool = defineTool(
 			args.push('--timeout', String(timeout));
 		}
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, QUICK_TIMEOUT_MS);
 
 		if (result.exit_code === 0) {
 			try {
@@ -445,7 +449,7 @@ export const sandbox_exec_tool = defineTool(
 			args.push('--timeout', String(timeout));
 		}
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, DEFAULT_TIMEOUT_MS);
 
 		// Log the result
 		log_command_audit({
@@ -486,7 +490,7 @@ export const sandbox_env_list_tool = defineTool(
 	async ({ id }) => {
 		const args = ['sandbox', 'env', 'list', id, '--json'];
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, QUICK_TIMEOUT_MS);
 
 		if (result.exit_code === 0) {
 			try {
@@ -521,7 +525,7 @@ export const sandbox_env_set_tool = defineTool(
 		const env_var = `${key}=${value}`;
 		const args = ['sandbox', 'env', 'set', id, env_var, '--json'];
 
-		const result = await run_cli(args);
+		const result = await run_cli(args, QUICK_TIMEOUT_MS);
 
 		if (result.exit_code === 0) {
 			try {
