@@ -68,7 +68,7 @@ cd ralph-town
 /usr/bin/git checkout -b docs/104-standardize-env-vars
 
 ## Implementation
-Standardize on GH_TOKEN everywhere. Search and replace GITHUB_PAT.
+Standardize on GH_TOKEN everywhere. This is now complete (GH_TOKEN is standard).
 
 Files to update:
 - CLAUDE.md

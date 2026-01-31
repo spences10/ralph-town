@@ -11,7 +11,7 @@
 	"postCreateCommand": "bun install && npm i -g tsx @anthropic-ai/claude-agent-sdk",
 	"remoteEnv": {
 		"ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
-		"GITHUB_PAT": "${localEnv:GITHUB_PAT}",
+		"GH_TOKEN": "${localEnv:GH_TOKEN}",
 		"LANGFUSE_SECRET_KEY": "${localEnv:LANGFUSE_SECRET_KEY}",
 		"LANGFUSE_PUBLIC_KEY": "${localEnv:LANGFUSE_PUBLIC_KEY}"
 	},

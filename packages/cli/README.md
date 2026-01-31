@@ -30,7 +30,7 @@ npx ralph-town
 | Variable          | Required        | Description     |
 | ----------------- | --------------- | --------------- |
 | `DAYTONA_API_KEY` | runtime=daytona | Daytona API key |
-| `GITHUB_PAT`      | git workflow    | GitHub token    |
+| `GH_TOKEN`      | git workflow    | GitHub token    |
 
 ## Development
 

@@ -87,7 +87,7 @@ ralph-town sandbox delete abc123
 ## Requirements
 
 - `DAYTONA_API_KEY` - Get from [daytona.io](https://daytona.io)
-- `GITHUB_PAT` - For git push operations (optional)
+- `GH_TOKEN` - For git push operations (optional)
 
 ## Packages
 
