@@ -111,22 +111,67 @@ Delete sandboxes to clean up.
 
 ## CLI Commands
 
-### Core Sandbox Commands
+### sandbox create
+
+Create a new Daytona sandbox.
 
 ```bash
-# Create a sandbox
-ralph-town sandbox create [--name NAME] [--snapshot NAME] [--env KEY=VALUE]
+ralph-town sandbox create [options]
+```
 
-# Get SSH credentials
+**Flags:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--snapshot <name>` | Use pre-built snapshot | - |
+| `--image <image>` | Base Docker image | `node:22-slim` |
+| `--name <name>` | Sandbox name | auto-generated |
+| `--auto-stop <minutes>` | Auto-stop interval in minutes | 15 |
+| `--timeout <seconds>` | Creation timeout in seconds | 120 |
+| `--env-file <path>` | Path to .env file | - |
+| `--env <KEY=VALUE>` | Environment variable (repeatable) | - |
+| `--json` | Output as JSON | false |
+
+**Examples:**
+```bash
+# Basic sandbox
+ralph-town sandbox create
+
+# With snapshot and env vars
+ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+
+# Custom image with timeout
+ralph-town sandbox create --image ubuntu:22.04 --timeout 180
+```
+
+### sandbox ssh
+
+Get SSH credentials for a sandbox.
+
+```bash
 ralph-town sandbox ssh <id> [--expires MINUTES]
+```
 
-# List active sandboxes
+### sandbox list
+
+List active sandboxes.
+
+```bash
 ralph-town sandbox list [--json]
+```
 
-# Execute command in sandbox
+### sandbox exec
+
+Execute command in sandbox.
+
+```bash
 ralph-town sandbox exec <id> <command>
+```
 
-# Delete sandbox
+### sandbox delete
+
+Delete a sandbox.
+
+```bash
 ralph-town sandbox delete <id>
 ```
 
