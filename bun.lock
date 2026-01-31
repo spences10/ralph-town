@@ -13,12 +13,12 @@
     },
     "packages/cli": {
       "name": "ralph-town",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "bin": {
         "ralph-town": "./dist/index.js",
       },
       "dependencies": {
-        "@daytonaio/sdk": "^0.138.0",
+        "@daytonaio/sdk": "0.138.0",
         "citty": "^0.2.0",
         "dotenv": "^17.2.3",
       },
@@ -29,7 +29,7 @@
     },
     "packages/mcp-ralph-town": {
       "name": "mcp-ralph-town",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "bin": {
         "mcp-ralph-town": "./dist/index.js",
       },

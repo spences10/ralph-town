@@ -52,3 +52,56 @@ export interface ExecuteResult {
 	/** Exit code */
 	exit_code: number;
 }
+
+/**
+ * Summary of a sandbox for list operations
+ */
+export interface SandboxSummary {
+	/** Sandbox ID */
+	id: string;
+	/** Current state (e.g., 'started', 'stopped') */
+	state: string;
+}
+
+/**
+ * Interface for sandbox instance operations
+ */
+export interface ISandbox {
+	/** Sandbox ID */
+	readonly id: string;
+	/** Current state */
+	readonly state: string | undefined;
+	/** Get SSH access credentials */
+	get_ssh_access(expires_minutes?: number): Promise<SshAccess>;
+	/** Execute a command in the sandbox */
+	execute(
+		cmd: string,
+		cwd?: string,
+		timeout_sec?: number,
+	): Promise<ExecuteResult>;
+	/** Upload a file to the sandbox */
+	upload_file(path: string, content: string | Buffer): Promise<void>;
+	/** Download a file from the sandbox */
+	download_file(path: string): Promise<Buffer>;
+	/** Delete the sandbox */
+	delete(timeout?: number): Promise<void>;
+	/** Get the working directory path */
+	get_work_dir(): Promise<string | undefined>;
+	/** Get the user's home directory path */
+	get_home_dir(): Promise<string | undefined>;
+}
+
+/**
+ * Provider interface for sandbox operations
+ * Abstracts the underlying sandbox service for future flexibility
+ */
+export interface SandboxProvider {
+	/** Create a new sandbox */
+	create(options: CreateSandboxOptions): Promise<ISandbox>;
+	/** Delete a sandbox by ID */
+	delete(id: string): Promise<void>;
+	/** List sandboxes with optional limit */
+	list(limit?: number): Promise<SandboxSummary[]>;
+	/** Get a sandbox by ID */
+	get(id: string): Promise<ISandbox>;
+}
