@@ -34,7 +34,8 @@ cd /home/daytona
 
 # Configure git credential helper (SECURE - token not in URL/logs)
 /usr/bin/git config --global credential.helper store
-echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+/bin/echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+/bin/chmod 600 ~/.git-credentials
 
 # Clone WITHOUT token in URL
 /usr/bin/git clone https://github.com/owner/repo.git
@@ -59,6 +60,27 @@ SSH sessions have broken PATH. ALWAYS use full paths:
 - `/usr/bin/gh` not `gh`
 - `/root/.bun/bin/bun` not `bun`
 - `/bin/ls`, `/bin/cat`, `/bin/echo`, etc.
+
+### CRITICAL: Never Embed Tokens in URLs
+
+**BAD - tokens leak via process list, logs, errors:**
+```bash
+/usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+```
+
+**GOOD - use credential helper:**
+```bash
+/usr/bin/git config --global credential.helper store
+/bin/echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+/bin/chmod 600 ~/.git-credentials
+/usr/bin/git clone https://github.com/owner/repo.git
+```
+
+Why tokens in URLs are dangerous:
+- Visible in `ps aux` process list
+- Logged in shell history
+- Exposed in git error messages
+- May appear in debug logs
 
 ### Common Mistakes
 
