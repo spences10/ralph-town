@@ -31,7 +31,13 @@ ralph-town sandbox ssh <sandbox-id>
 # 3. SSH in and work (USE FULL PATHS - PATH is broken)
 ssh <token>@ssh.app.daytona.io
 cd /home/daytona
-/usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+
+# Configure git credential helper (SECURE - token not in URL/logs)
+/usr/bin/git config --global credential.helper store
+echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+
+# Clone WITHOUT token in URL
+/usr/bin/git clone https://github.com/owner/repo.git
 cd repo
 /usr/bin/git config user.email "teammate@example.com"
 /usr/bin/git config user.name "teammate"
@@ -71,6 +77,10 @@ SSH sessions have broken PATH. ALWAYS use full paths:
 4. **GH_TOKEN not expanded** - must source .env first
    - BAD: `sandbox create --env "GH_TOKEN=$GH_TOKEN"` (without source)
    - GOOD: `source .env && sandbox create --env "GH_TOKEN=$GH_TOKEN"`
+
+5. **Token in git URL** - leaks to logs/process list
+   - BAD: `git clone https://$GH_TOKEN@github.com/...`
+   - GOOD: Use credential helper (see workflow above)
 
 ### PR Best Practices
 

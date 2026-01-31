@@ -1,10 +1,26 @@
 # Git Workflow in Sandbox
 
+## Setup Credentials (SECURE)
+
+Before cloning, configure git to use credential helper:
+
+```bash
+# Configure credential helper (one-time setup)
+/usr/bin/git config --global credential.helper store
+echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+```
+
+This stores credentials securely - tokens never appear in:
+- Command line (process list)
+- Shell history
+- Error messages or logs
+
 ## Clone Repository
 
 ```bash
 cd /home/daytona
-/usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+# Clone WITHOUT token in URL
+/usr/bin/git clone https://github.com/owner/repo.git
 cd repo
 ```
 

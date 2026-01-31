@@ -148,20 +148,31 @@ ralph-town sandbox create \
 
 The token is then available inside the sandbox as `$GH_TOKEN`.
 
-### Teammate Git Workflow
+### Teammate Git Workflow (Secure)
 
-Inside the sandbox, teammates use the token for authenticated git:
+Inside the sandbox, teammates use the credential helper to avoid
+leaking tokens in URLs, logs, or process lists:
 
 ```bash
-# Clone with token (no interactive auth needed)
-git clone https://$GH_TOKEN@github.com/user/repo.git
+# Setup credential helper (one-time)
+git config --global credential.helper store
+echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
 
-# Or set remote with token
-git remote set-url origin https://$GH_TOKEN@github.com/user/repo.git
+# Clone WITHOUT token in URL (credentials auto-applied)
+git clone https://github.com/user/repo.git
 
 # Push works without prompts
 git push -u origin feature-branch
 ```
+
+**Why not embed token in URL?**
+Tokens in URLs like `git clone https://$TOKEN@github.com/...` leak via:
+- Process list (`ps aux` shows full command line)
+- Shell history
+- Error messages and logs
+- Debug output
+
+The credential helper keeps the token in a protected file instead.
 
 ### Creating PRs from Sandbox
 
@@ -178,9 +189,10 @@ gh pr create --title "Feature X" --body "Description"
 ### Security Considerations
 
 1. **Never bake tokens into snapshots** - Pass at runtime via `--env`
-2. **Tokens visible in sandbox** - Only pass what teammates need
-3. **Use scoped tokens** - Minimum permissions (repo access only)
-4. **Sandboxes are ephemeral** - Tokens gone when sandbox deleted
+2. **Use credential helper** - Never embed tokens in git URLs
+3. **Tokens visible in sandbox** - Only pass what teammates need
+4. **Use scoped tokens** - Minimum permissions (repo access only)
+5. **Sandboxes are ephemeral** - Tokens gone when sandbox deleted
 
 ### Known Issues & Workarounds
 
@@ -209,7 +221,10 @@ ralph-town sandbox ssh abc123
 
 # Teammate SSHs in and works
 ssh xyz789@ssh.app.daytona.io
-> git clone https://$GH_TOKEN@github.com/user/repo.git
+> # Setup credentials (secure)
+> git config --global credential.helper store
+> echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+> git clone https://github.com/user/repo.git
 > cd repo
 > git checkout -b feature/new-thing
 > # ... make changes ...
