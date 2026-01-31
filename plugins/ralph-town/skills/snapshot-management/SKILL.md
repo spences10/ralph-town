@@ -72,3 +72,34 @@ ralph-town sandbox snapshot create --json
 - Run `preflight` before spawning teammates
 - Run `snapshot create` if preflight fails
 - Use `--force` to rebuild after tool updates
+
+## SDK Usage
+
+```typescript
+import { Daytona, Image } from '@daytonaio/sdk';
+
+const daytona = new Daytona();
+
+// Create snapshot
+const image = Image.base('debian:bookworm-slim')
+  .runCommands(
+    'apt-get update && apt-get install -y curl git',
+    'curl -fsSL https://bun.sh/install | bash',
+  )
+  .env({ PATH: '/root/.bun/bin:$PATH' })
+  .workdir('/home/daytona');
+
+await daytona.snapshot.create(
+  { name: 'my-snapshot', image },
+  { onLogs: console.log, timeout: 300 },
+);
+
+// List/check snapshots
+const snapshots = await daytona.snapshot.list();
+const snapshot = await daytona.snapshot.get('ralph-town-dev');
+```
+
+## Known Limitation
+
+`executeCommand()` returns exit code `-1` on snapshot sandboxes.
+Use SSH instead. See [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)

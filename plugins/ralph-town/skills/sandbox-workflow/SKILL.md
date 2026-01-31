@@ -4,17 +4,37 @@ name: sandbox-workflow
 description: Use for teammate sandbox operations - SSH access, git workflow, full paths required
 ---
 
-# Sandbox Workflow (Teammate)
+# Sandbox Workflow
 
-## Quick Start
+## Team-Lead Quick Start
 
-SSH into sandbox and work with full paths:
+```bash
+source .env  # Load GH_TOKEN
+
+# 1. Create sandbox
+ralph-town sandbox create --snapshot ralph-town-dev
+
+# 2. Get SSH token
+ralph-town sandbox ssh <sandbox-id> --show-secrets
+
+# 3. Configure credentials via SSH (BEFORE spawning teammate)
+ssh <token>@ssh.app.daytona.io "
+  /usr/bin/git config --global credential.helper store &&
+  /bin/echo 'https://oauth2:$GH_TOKEN@github.com' > ~/.git-credentials &&
+  /bin/chmod 600 ~/.git-credentials
+"
+
+# 4. Spawn teammate with SSH token
+# 5. Cleanup: ralph-town sandbox delete <sandbox-id>
+```
+
+## Teammate Quick Start
 
 ```bash
 ssh <token>@ssh.app.daytona.io
 cd /home/daytona
 
-# Clone and work (credentials pre-configured by team-lead)
+# Credentials pre-configured by team-lead
 /usr/bin/git clone https://github.com/owner/repo.git
 cd repo
 /usr/bin/git config user.email "teammate@example.com"
@@ -29,32 +49,23 @@ cd repo
 
 ## Critical Rules
 
-**ALWAYS use full paths** - SSH PATH is broken:
-- `/usr/bin/git` not `git`
-- `/usr/bin/gh` not `gh`
-- `/root/.bun/bin/bun` not `bun`
+**Full paths required** - SSH PATH is broken:
+- `/usr/bin/git`, `/usr/bin/gh`, `/root/.bun/bin/bun`
 - `/bin/ls`, `/bin/cat`, `/bin/echo`
 
 **Work directory:** `/home/daytona` (not /workspaces)
 
-**Credentials:** Already configured by team-lead. Just clone and push.
+**Quoting:** `$GH_TOKEN` must expand locally:
+- GOOD: `ssh ... "...echo '...$GH_TOKEN@...'..."`
+- BAD: `ssh ... '...echo "...$GH_TOKEN@..."...'`
 
-## Fail Fast
+## Fail Fast (Teammates)
 
 If sandbox fails:
 1. Report error to team-lead immediately
 2. DO NOT attempt workarounds
 3. DO NOT keep retrying - wasting tokens
-4. Team-lead will fix or spawn replacement
-
-## Known Issues
-
-| Issue | Workaround |
-|-------|------------|
-| SSH PATH broken | Full paths required |
-| SSH exit code 255 | Ignore - check output |
-| exec returns -1 | Use SSH instead |
 
 ## References
 
-- [references/full-workflow.md](references/full-workflow.md) - Complete workflow details
+- [references/full-workflow.md](references/full-workflow.md) - Complete details
