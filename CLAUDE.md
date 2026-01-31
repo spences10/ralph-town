@@ -20,44 +20,57 @@ tool gives each teammate their own Daytona sandbox instead.
 # IMPORTANT: Source .env first so $GH_TOKEN expands
 source .env
 
-# 1. Create sandbox with git token (no snapshot needed)
-ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
+# 1. Create sandbox FROM SNAPSHOT (has gh, git, bun pre-installed)
+ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
 # Returns sandbox ID
 
-# 2. Install gh CLI in sandbox at runtime
-curl -sL https://github.com/cli/cli/releases/download/v2.65.0/gh_2.65.0_linux_amd64.tar.gz | tar -xz -C /tmp && mkdir -p ~/bin && mv /tmp/gh_*/bin/gh ~/bin/
+# 2. Get SSH access (exec returns -1 on snapshots, use SSH)
+ralph-town sandbox ssh <sandbox-id>
+# Returns: ssh <token>@ssh.app.daytona.io
 
-# 3. Teammate works in sandbox:
-#    cd /home/daytona
-#    git clone https://$GH_TOKEN@github.com/owner/repo.git
-#    cd repo
-#    git checkout -b fix/my-branch
-#    # make changes...
-#    git add -A
-#    git commit -m "message"
-#    git push -u origin fix/my-branch
-#    ~/bin/gh pr create --title "title" --body "body"
+# 3. SSH in and work (USE FULL PATHS - PATH is broken)
+ssh <token>@ssh.app.daytona.io
+cd /home/daytona
+/usr/bin/git clone https://$GH_TOKEN@github.com/owner/repo.git
+cd repo
+/usr/bin/git config user.email "teammate@example.com"
+/usr/bin/git config user.name "teammate"
+/usr/bin/git checkout -b fix/my-branch
+# make changes...
+/usr/bin/git add -A
+/usr/bin/git commit -m "message"
+/usr/bin/git push -u origin fix/my-branch
+/usr/bin/gh pr create --title "title" --body "Fixes #N"
 
 # 4. Delete sandbox when done
 ralph-town sandbox delete <sandbox-id>
 ```
 
-### SSH Debugging Gotchas
+### CRITICAL: Full Paths Required
 
-When debugging via SSH, note:
-1. **Work dir is `/home/daytona`** - NOT `/workspaces`
-2. **PATH may be broken** - use full paths if needed:
-   - `/usr/bin/git` not `git`
-   - `/bin/ls` not `ls`
-3. **GH_TOKEN works** - `$GH_TOKEN` is available if passed via `--env`
+SSH sessions have broken PATH. ALWAYS use full paths:
+- `/usr/bin/git` not `git`
+- `/usr/bin/gh` not `gh`
+- `/root/.bun/bin/bun` not `bun`
+- `/bin/ls`, `/bin/cat`, `/bin/echo`, etc.
 
 ### Common Mistakes
 
-1. **GH_TOKEN not expanded** - must source .env first
-   - BAD:  `sandbox create --env "GH_TOKEN=$GH_TOKEN"` (without source)
-   - GOOD: `source .env && sandbox create --env "GH_TOKEN=$GH_TOKEN"`
+1. **Not using snapshot** - use `--snapshot ralph-town-dev`
+   - Snapshot has gh, git, bun pre-installed
+   - Without snapshot, you'd need to install tools at runtime
 
-2. **gh CLI not installed** - must install at runtime (see workflow above)
+2. **Using exec instead of SSH** - exec returns -1 on snapshots
+   - This is a known Daytona bug (#2283)
+   - ALWAYS use SSH for snapshot-based sandboxes
+
+3. **Not using full paths** - PATH is broken in SSH
+   - BAD: `git clone ...`
+   - GOOD: `/usr/bin/git clone ...`
+
+4. **GH_TOKEN not expanded** - must source .env first
+   - BAD: `sandbox create --env "GH_TOKEN=$GH_TOKEN"` (without source)
+   - GOOD: `source .env && sandbox create --env "GH_TOKEN=$GH_TOKEN"`
 
 ### PR Best Practices
 
@@ -66,11 +79,14 @@ When debugging via SSH, note:
 
 ### Known Issues (READ THESE!)
 
-- **SSH PATH BROKEN** - use full paths: `/usr/bin/git` - #33
-- **Work dir is `/home/daytona`** - not /workspaces
-- `sandbox exec` returns -1 (use SSH instead) - #31
-- `--name` flag doesn't set display name - #34
-- **executeCommand returns -1 on snapshots** - [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
+| Issue | Workaround |
+|-------|------------|
+| SSH PATH broken | Use full paths: `/usr/bin/git`, `/usr/bin/gh` |
+| `exec` returns -1 on snapshots | Use SSH instead |
+| Work dir is `/home/daytona` | Not /workspaces |
+| SSH exit code 255 | Ignore - check output, not exit code |
+
+Upstream: [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
 
 ## Code Style
 
