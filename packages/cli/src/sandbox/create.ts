@@ -6,6 +6,7 @@
 import { Image } from '@daytonaio/sdk';
 import type { Sandbox as DaytonaSandbox } from '@daytonaio/sdk';
 import { create_daytona_client } from './client.js';
+import { with_retry } from './errors.js';
 import { Sandbox } from './sandbox.js';
 import type { CreateSandboxOptions } from './types.js';
 import { validate_sandbox_name } from './validation.js';
@@ -70,18 +71,20 @@ export async function create_sandbox(
 	// If snapshot provided, use it directly (fast path)
 	if (options.snapshot) {
 		try {
-			raw_sandbox = await daytona.create(
-				{
-					name: options.name,
-					snapshot: options.snapshot,
-					language: 'typescript',
-					envVars: options.env_vars,
-					labels: options.labels,
-					autoStopInterval: options.auto_stop_interval,
-				},
-				{
-					timeout: options.timeout ?? DEFAULT_TIMEOUT,
-				},
+			raw_sandbox = await with_retry(() =>
+				daytona.create(
+					{
+						name: options.name,
+						snapshot: options.snapshot,
+						language: 'typescript',
+						envVars: options.env_vars,
+						labels: options.labels,
+						autoStopInterval: options.auto_stop_interval,
+					},
+					{
+						timeout: options.timeout ?? DEFAULT_TIMEOUT,
+					},
+				),
 			);
 			return new Sandbox(daytona, raw_sandbox);
 		} catch (error) {
@@ -116,19 +119,21 @@ export async function create_sandbox(
 	}
 
 	try {
-		raw_sandbox = await daytona.create(
-			{
-				name: options.name,
-				image,
-				language: 'typescript',
-				envVars: options.env_vars,
-				labels: options.labels,
-				autoStopInterval: options.auto_stop_interval,
-			},
-			{
-				timeout: options.timeout ?? DEFAULT_TIMEOUT,
-				onSnapshotCreateLogs: options.on_build_log,
-			},
+		raw_sandbox = await with_retry(() =>
+			daytona.create(
+				{
+					name: options.name,
+					image,
+					language: 'typescript',
+					envVars: options.env_vars,
+					labels: options.labels,
+					autoStopInterval: options.auto_stop_interval,
+				},
+				{
+					timeout: options.timeout ?? DEFAULT_TIMEOUT,
+					onSnapshotCreateLogs: options.on_build_log,
+				},
+			),
 		);
 		return new Sandbox(daytona, raw_sandbox);
 	} catch (error) {
