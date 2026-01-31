@@ -11,3 +11,6 @@ export { Sandbox } from './sandbox.js';
 export type {
 	CreateSandboxOptions, ExecuteResult, SshAccess
 } from './types.js';
+export {
+	SandboxNameValidationError, validate_sandbox_name
+} from './validation.js';
