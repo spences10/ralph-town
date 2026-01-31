@@ -10,6 +10,7 @@ import {
 	is_missing_api_key_error,
 } from '../../sandbox/index.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
+import type { Sandbox } from '../../sandbox/index.js';
 
 function parse_env_file(path: string): Record<string, string> {
 	const content = fs.readFileSync(path, 'utf-8');
@@ -107,8 +108,9 @@ export default defineCommand({
 			console.log('Creating sandbox...');
 		}
 
+		let sandbox: Sandbox | undefined;
 		try {
-			const sandbox = await create_sandbox({
+			sandbox = await create_sandbox({
 				name: args.name,
 				snapshot: args.snapshot,
 				image: args.image,
@@ -141,6 +143,15 @@ export default defineCommand({
 				}
 			}
 		} catch (error) {
+			// Clean up sandbox on partial failure
+			if (sandbox) {
+				try {
+					await sandbox.delete();
+				} catch {
+					// Ignore cleanup errors
+				}
+			}
+
 			if (is_missing_api_key_error(error)) {
 				if (args.json) {
 					console.error(JSON.stringify({ error: error.message }));
