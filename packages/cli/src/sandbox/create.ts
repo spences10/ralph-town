@@ -4,6 +4,7 @@
  */
 
 import { Image } from '@daytonaio/sdk';
+import type { Sandbox as DaytonaSandbox } from '@daytonaio/sdk';
 import { create_daytona_client } from './client.js';
 import { Sandbox } from './sandbox.js';
 import type { CreateSandboxOptions } from './types.js';
@@ -36,6 +37,21 @@ export function create_default_image(
 }
 
 /**
+ * Attempt to cleanup a partially created sandbox
+ * @param sandbox - The sandbox to cleanup (may be undefined)
+ */
+async function cleanup_partial_sandbox(
+	sandbox: DaytonaSandbox | undefined,
+): Promise<void> {
+	if (!sandbox) return;
+	try {
+		await sandbox.delete(30);
+	} catch {
+		// Ignore cleanup errors - sandbox may not exist or be deletable
+	}
+}
+
+/**
  * Create a new Daytona sandbox
  * @param options - Sandbox creation options
  * @returns Sandbox instance
@@ -49,23 +65,29 @@ export async function create_sandbox(
 	}
 
 	const daytona = create_daytona_client();
+	let raw_sandbox: DaytonaSandbox | undefined;
 
 	// If snapshot provided, use it directly (fast path)
 	if (options.snapshot) {
-		const sandbox = await daytona.create(
-			{
-				name: options.name,
-				snapshot: options.snapshot,
-				language: 'typescript',
-				envVars: options.env_vars,
-				labels: options.labels,
-				autoStopInterval: options.auto_stop_interval,
-			},
-			{
-				timeout: options.timeout ?? DEFAULT_TIMEOUT,
-			},
-		);
-		return new Sandbox(daytona, sandbox);
+		try {
+			raw_sandbox = await daytona.create(
+				{
+					name: options.name,
+					snapshot: options.snapshot,
+					language: 'typescript',
+					envVars: options.env_vars,
+					labels: options.labels,
+					autoStopInterval: options.auto_stop_interval,
+				},
+				{
+					timeout: options.timeout ?? DEFAULT_TIMEOUT,
+				},
+			);
+			return new Sandbox(daytona, raw_sandbox);
+		} catch (error) {
+			await cleanup_partial_sandbox(raw_sandbox);
+			throw error;
+		}
 	}
 
 	// Determine the image to use
@@ -93,20 +115,24 @@ export async function create_sandbox(
 		);
 	}
 
-	const sandbox = await daytona.create(
-		{
-			name: options.name,
-			image,
-			language: 'typescript',
-			envVars: options.env_vars,
-			labels: options.labels,
-			autoStopInterval: options.auto_stop_interval,
-		},
-		{
-			timeout: options.timeout ?? DEFAULT_TIMEOUT,
-			onSnapshotCreateLogs: options.on_build_log,
-		},
-	);
-
-	return new Sandbox(daytona, sandbox);
+	try {
+		raw_sandbox = await daytona.create(
+			{
+				name: options.name,
+				image,
+				language: 'typescript',
+				envVars: options.env_vars,
+				labels: options.labels,
+				autoStopInterval: options.auto_stop_interval,
+			},
+			{
+				timeout: options.timeout ?? DEFAULT_TIMEOUT,
+				onSnapshotCreateLogs: options.on_build_log,
+			},
+		);
+		return new Sandbox(daytona, raw_sandbox);
+	} catch (error) {
+		await cleanup_partial_sandbox(raw_sandbox);
+		throw error;
+	}
 }
