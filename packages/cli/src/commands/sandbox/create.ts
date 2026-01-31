@@ -15,6 +15,8 @@ import {
 import { parse_int_flag_or_exit } from '../../core/utils.js';
 import type { Sandbox } from '../../sandbox/index.js';
 
+const REDACTED = '***REDACTED***';
+
 function parse_env_file(path: string): Record<string, string> {
 	const content = fs.readFileSync(path, 'utf-8');
 	const env: Record<string, string> = {};
@@ -25,6 +27,11 @@ function parse_env_file(path: string): Record<string, string> {
 		if (key) env[key] = rest.join('=');
 	}
 	return env;
+}
+
+function mask_token(token: string): string {
+	if (token.length <= 4) return '****';
+	return token.slice(0, 4) + '****' + token.slice(-4);
 }
 
 export default defineCommand({
@@ -65,6 +72,14 @@ export default defineCommand({
 		json: {
 			type: 'boolean',
 			description: 'Output as JSON',
+		},
+		ssh: {
+			type: 'boolean',
+			description: 'Output SSH command after creation',
+		},
+		'show-secrets': {
+			type: 'boolean',
+			description: 'Show unmasked SSH token (use with --ssh)',
 		},
 	},
 	async run({ args }) {
@@ -130,20 +145,58 @@ export default defineCommand({
 
 			const work_dir = await sandbox.get_work_dir();
 
+			// Get SSH access if requested
+			let ssh_info: { token: string; command: string } | undefined;
+			if (args.ssh) {
+				const access = await sandbox.get_ssh_access();
+				ssh_info = {
+					token: access.token,
+					command: access.command,
+				};
+			}
+
 			if (args.json) {
-				console.log(
-					JSON.stringify({
-						id: sandbox.id,
-						state: sandbox.state,
-						work_dir: work_dir || null,
-					}),
-				);
+				const output: Record<string, unknown> = {
+					id: sandbox.id,
+					state: sandbox.state,
+					work_dir: work_dir || null,
+				};
+				if (ssh_info) {
+					const show_secrets = args['show-secrets'];
+					const display_token = show_secrets
+						? ssh_info.token
+						: REDACTED;
+					output.ssh = {
+						token: display_token,
+						token_masked: !show_secrets,
+						command:
+							'ssh ' + display_token + '@ssh.app.daytona.io',
+					};
+				}
+				console.log(JSON.stringify(output));
 			} else {
 				console.log('\nSandbox created successfully!');
 				console.log('ID: ' + sandbox.id);
 				console.log('State: ' + sandbox.state);
 				if (work_dir) {
 					console.log('Working directory: ' + work_dir);
+				}
+				if (ssh_info) {
+					const show_secrets = args['show-secrets'];
+					if (show_secrets) {
+						console.log(
+							'SSH: ssh ' +
+								ssh_info.token +
+								'@ssh.app.daytona.io',
+						);
+					} else {
+						const masked = mask_token(ssh_info.token);
+						console.log(
+							'SSH: ssh ' +
+								masked +
+								'@ssh.app.daytona.io (use --show-secrets for full token)',
+						);
+					}
 				}
 			}
 		} catch (error) {
