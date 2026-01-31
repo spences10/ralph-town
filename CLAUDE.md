@@ -8,6 +8,17 @@ teams to work in isolated environments.
 When you spawn teammates, they normally share your filesystem. This
 tool gives each teammate their own Daytona sandbox instead.
 
+## Prerequisites
+
+Before using ralph-town, you need:
+
+1. **Daytona account** - Sign up at https://app.daytona.io
+2. **DAYTONA_API_KEY** - Get from https://app.daytona.io/dashboard/keys
+   - Add to `.env`: `DAYTONA_API_KEY=your-key-here`
+3. **GH_TOKEN** - GitHub PAT with `repo` scope
+   - Create at https://github.com/settings/tokens
+   - Add to `.env`: `GH_TOKEN=your-token-here`
+
 ## Teammate Sandbox Workflow
 
 ### Prerequisites
