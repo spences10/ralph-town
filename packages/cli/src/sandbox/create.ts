@@ -7,6 +7,7 @@ import { Image } from '@daytonaio/sdk';
 import { create_daytona_client } from './client.js';
 import { Sandbox } from './sandbox.js';
 import type { CreateSandboxOptions } from './types.js';
+import { validate_sandbox_name } from './validation.js';
 
 /** Default base image for sandboxes */
 const DEFAULT_BASE_IMAGE = 'node:22-slim';
@@ -42,6 +43,11 @@ export function create_default_image(
 export async function create_sandbox(
 	options: CreateSandboxOptions = {},
 ): Promise<Sandbox> {
+	// Validate sandbox name if provided
+	if (options.name) {
+		validate_sandbox_name(options.name);
+	}
+
 	const daytona = create_daytona_client();
 
 	// If snapshot provided, use it directly (fast path)
