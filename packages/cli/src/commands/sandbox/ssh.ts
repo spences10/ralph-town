@@ -14,9 +14,9 @@ import {
 } from '../../sandbox/index.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
 
-const REDACTED = '***REDACTED***';
+export const REDACTED = '***REDACTED***';
 
-function mask_token(token: string): string {
+export function mask_token(token: string): string {
 	if (token.length <= 4) return '****';
 	return token.slice(0, 4) + '****' + token.slice(-4);
 }
