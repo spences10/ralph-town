@@ -99,11 +99,10 @@ describe('create_sandbox validation', () => {
 			snapshot: 'my-snapshot',
 		});
 
-		const last_call =
-			mock_daytona_client.create.mock.calls[
-				mock_daytona_client.create.mock.calls.length - 1
-			];
-		const create_options = last_call[0];
+		const calls = mock_daytona_client.create.mock.calls as unknown[][];
+		expect(calls.length).toBeGreaterThan(0);
+		const last_call = calls[calls.length - 1];
+		const create_options = last_call[0] as Record<string, unknown>;
 
 		expect(create_options.snapshot).toBe('my-snapshot');
 		// Snapshot path should not include image
@@ -113,11 +112,10 @@ describe('create_sandbox validation', () => {
 	test('uses image path when no snapshot provided', async () => {
 		await create_sandbox({ name: 'test-sandbox' });
 
-		const last_call =
-			mock_daytona_client.create.mock.calls[
-				mock_daytona_client.create.mock.calls.length - 1
-			];
-		const create_options = last_call[0];
+		const calls = mock_daytona_client.create.mock.calls as unknown[][];
+		expect(calls.length).toBeGreaterThan(0);
+		const last_call = calls[calls.length - 1];
+		const create_options = last_call[0] as Record<string, unknown>;
 
 		// Image path should include image, not snapshot
 		expect(create_options.snapshot).toBeUndefined();

@@ -16,14 +16,31 @@ mock.module('child_process', () => ({
 // Import after mocking
 import {
 	is_command_allowed,
-	sandbox_create_tool,
-	sandbox_delete_tool,
-	sandbox_env_list_tool,
-	sandbox_env_set_tool,
-	sandbox_exec_tool,
-	sandbox_list_tool,
-	sandbox_ssh_tool,
+	sandbox_create_tool as _sandbox_create_tool,
+	sandbox_delete_tool as _sandbox_delete_tool,
+	sandbox_env_list_tool as _sandbox_env_list_tool,
+	sandbox_env_set_tool as _sandbox_env_set_tool,
+	sandbox_exec_tool as _sandbox_exec_tool,
+	sandbox_list_tool as _sandbox_list_tool,
+	sandbox_ssh_tool as _sandbox_ssh_tool,
 } from '../tools/sandbox';
+
+// Type helper - defineTool returns objects with execute at runtime
+// but CreatedTool type doesn't include it
+type WithExecute<T> = T & {
+	execute: (input?: Record<string, unknown>) => Promise<{
+		content: { type: string; text: string }[];
+		isError?: boolean;
+	}>;
+};
+
+const sandbox_create_tool = _sandbox_create_tool as WithExecute<typeof _sandbox_create_tool>;
+const sandbox_delete_tool = _sandbox_delete_tool as WithExecute<typeof _sandbox_delete_tool>;
+const sandbox_env_list_tool = _sandbox_env_list_tool as WithExecute<typeof _sandbox_env_list_tool>;
+const sandbox_env_set_tool = _sandbox_env_set_tool as WithExecute<typeof _sandbox_env_set_tool>;
+const sandbox_exec_tool = _sandbox_exec_tool as WithExecute<typeof _sandbox_exec_tool>;
+const sandbox_list_tool = _sandbox_list_tool as WithExecute<typeof _sandbox_list_tool>;
+const sandbox_ssh_tool = _sandbox_ssh_tool as WithExecute<typeof _sandbox_ssh_tool>;
 
 // Helper to reset mock and configure new response
 function reset_mock(
