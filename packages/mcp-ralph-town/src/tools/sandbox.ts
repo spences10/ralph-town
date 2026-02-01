@@ -361,7 +361,7 @@ const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
  * Validate command against allowlist
  * Returns true if command is allowed, false otherwise
  */
-function is_command_allowed(cmd: string): boolean {
+export function is_command_allowed(cmd: string): boolean {
 	const trimmed = cmd.trim();
 	if (!trimmed) return false;
 
