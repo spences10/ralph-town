@@ -25,7 +25,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@daytonaio/sdk": "0.140.0",
+		"@daytonaio/sdk": "0.141.0",
 		"citty": "^0.2.0",
 		"dotenv": "^17.2.3"
 	},
