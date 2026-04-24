@@ -7,6 +7,7 @@ describe('is_command_allowed', () => {
 			'git status',
 			'gh pr list',
 			'pnpm test',
+			'pnpx my-pi@latest --help',
 			'node ./dist/index.js',
 			'vitest run',
 			'ls -la',

@@ -6,7 +6,6 @@
  */
 
 import { Daytona, Image } from '@daytonaio/sdk';
-import 'dotenv/config';
 
 const SNAPSHOT_NAME = 'ralph-town-dev';
 

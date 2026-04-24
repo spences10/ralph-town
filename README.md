@@ -1,43 +1,52 @@
 # ralph-town
 
-Daytona sandbox management for Claude Code teams.
+Disposable Daytona sandboxes for LLM evals, CLI smoke tests, and
+isolated command execution.
 
 ## Why?
 
-When Claude Code spawns teammates, they all share the same filesystem.
-This causes problems:
+LLM tools and eval harnesses often need to run commands against real
+projects without touching your local machine. A disposable Daytona
+sandbox gives each run a clean environment, controlled credentials,
+and structured output that another tool or model can consume.
 
-- Two agents editing the same file conflict
-- Experimental code runs on your actual codebase
-- Can't work on multiple features in parallel
+## Quick start
 
-**Solution**: Give each teammate their own isolated Daytona sandbox.
+```bash
+# Run a command in a fresh sandbox, then delete it
+ralph-town run -- pnpx my-pi@latest --help
 
-## How It Works
+# Preserve the sandbox for debugging
+ralph-town run --keep -- pnpx my-pi@latest --help
 
+# Run against a repository checkout
+ralph-town run \
+  --repo https://github.com/user/project \
+  -- pnpm test
+
+# Use structured output for eval harnesses
+ralph-town run --json -- pnpx my-pi@latest --help
 ```
-Claude Code Team Lead (local)
-├── Creates sandbox (~1.3s with cached image)
-├── Gets SSH credentials for teammate
-│
-├── Teammate A ──SSH──> Sandbox A ──> feature-branch-a
-├── Teammate B ──SSH──> Sandbox B ──> feature-branch-b
-└── Teammate C ──SSH──> Sandbox C ──> feature-branch-c
-```
 
-Each teammate works in complete isolation. Push branches, create PRs,
-delete sandboxes when done.
+`run` creates a sandbox, executes the command over SSH, captures
+stdout/stderr/exit code, and deletes the sandbox unless `--keep` is
+set.
 
 ## Install
 
 ```bash
 npm install -g ralph-town
+# or
+npx ralph-town --help
 ```
 
-## CLI Commands
+## Commands
 
 ```bash
-# Create a sandbox
+# One-shot command execution
+ralph-town run -- <command>
+
+# Create a reusable sandbox
 ralph-town sandbox create [--name NAME]
 
 # Get SSH credentials
@@ -46,64 +55,63 @@ ralph-town sandbox ssh <id>
 # List active sandboxes
 ralph-town sandbox list
 
-# Execute command in sandbox
+# Execute command in an existing sandbox
 ralph-town sandbox exec <id> <command>
+
+# Check sandbox health
+ralph-town sandbox health <id> [--ping]
 
 # Delete sandbox
 ralph-town sandbox delete <id>
 ```
 
-## Example Workflow
+## JSON result shape
 
 ```bash
-# Create sandbox for teammate
-ralph-town sandbox create --name feature-work
-# => Sandbox ID: abc123
-
-# Get SSH access
-ralph-town sandbox ssh abc123
-# => ssh xyz789@ssh.app.daytona.io
-
-# Teammate SSHs in and works
-ssh xyz789@ssh.app.daytona.io
-$ git clone https://github.com/user/repo.git
-$ cd repo && git checkout -b feature/new-thing
-$ # ... make changes ...
-$ git push -u origin feature/new-thing
-
-# Cleanup
-ralph-town sandbox delete abc123
+ralph-town run --json -- pnpx my-pi@latest --help
 ```
 
-## Performance
-
-| Operation                     | Time  |
-| ----------------------------- | ----- |
-| First sandbox (builds image)  | ~18s  |
-| Subsequent sandboxes (cached) | ~1.3s |
-
-14x speedup after first run.
+```json
+{
+	"sandbox_id": "abc123",
+	"command": "pnpx my-pi@latest --help",
+	"repo": null,
+	"branch": null,
+	"cwd": null,
+	"exit_code": 0,
+	"stdout": "...",
+	"stderr": "",
+	"timed_out": false,
+	"duration_ms": 2312,
+	"kept": false,
+	"deleted": true,
+	"cleanup_error": null
+}
+```
 
 ## Requirements
 
 - `DAYTONA_API_KEY` - Get from [daytona.io](https://daytona.io)
-- `GH_TOKEN` - For git push operations (optional)
+- `GH_TOKEN` - Optional, only needed for GitHub workflows inside the
+  sandbox
 
 ## Packages
 
-| Package                   | Description                |
-| ------------------------- | -------------------------- |
-| `packages/cli`            | Main CLI tool              |
-| `packages/mcp-ralph-town` | MCP server for Claude Code |
+| Package                   | Description                          |
+| ------------------------- | ------------------------------------ |
+| `packages/cli`            | Main CLI tool                        |
+| `packages/mcp-ralph-town` | MCP server for sandbox orchestration |
 
 ## Development
 
 ```bash
-pnpm dev          # Development mode
-pnpm run build    # Compile TypeScript
+pnpm dev
+pnpm run check
+pnpm run test
+pnpm run build
 ```
 
 ## Research
 
-See [docs/RESEARCH.md](docs/RESEARCH.md) for architecture notes and
-findings from our exploration.
+See [docs/RESEARCH.md](docs/RESEARCH.md) for Daytona SDK notes and
+implementation findings.

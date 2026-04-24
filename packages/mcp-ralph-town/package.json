@@ -1,7 +1,7 @@
 {
 	"name": "mcp-ralph-town",
 	"version": "0.0.2",
-	"description": "MCP server wrapping Ralph Loop CLI",
+	"description": "MCP server for disposable Daytona sandbox orchestration",
 	"license": "MIT",
 	"author": "Scott Spence",
 	"repository": {

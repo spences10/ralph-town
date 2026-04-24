@@ -28,6 +28,7 @@ const cli_path = get_cli_path();
 // Per-tool timeout constants
 const QUICK_TIMEOUT_MS = 30000; // 30 seconds for quick ops (list, ssh, delete)
 const DEFAULT_TIMEOUT_MS = 120000; // 2 minutes for standard ops (create, exec)
+const RUN_TIMEOUT_MS = 600000; // 10 minutes for disposable sandbox runs
 
 /**
  * Execute CLI command and return result
@@ -94,7 +95,7 @@ export const sandbox_create_tool = defineTool(
 	{
 		name: 'sandbox_create',
 		description:
-			'Create a new Daytona sandbox with pre-baked image (node:22-slim with git, typescript, tsx). Options: image (base Docker image), name (sandbox label), auto_stop (minutes, 0 to disable), timeout (seconds, default 120), snapshot (snapshot ID to create from), env (environment variables as KEY=value)',
+			'Create a new Daytona sandbox with pre-baked image (node:22-bookworm-slim with git, pnpm, typescript, tsx). Options: image (base Docker image), name (sandbox label), auto_stop (minutes, 0 to disable), timeout (seconds, default 120), snapshot (snapshot ID to create from), env (environment variables as KEY=value)',
 		schema: v.object({
 			image: v.optional(v.pipe(v.string(), v.minLength(1))),
 			name: v.optional(v.pipe(v.string(), v.minLength(1))),
@@ -142,6 +143,80 @@ export const sandbox_create_tool = defineTool(
 		} else {
 			return tool.error(
 				`Failed to create sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
+			);
+		}
+	},
+);
+
+/**
+ * sandbox_run - Run a command in a fresh disposable sandbox
+ */
+export const sandbox_run_tool = defineTool(
+	{
+		name: 'sandbox_run',
+		description:
+			'Create a fresh Daytona sandbox, run a command via SSH, and delete it by default. Best for LLM evals, CLI smoke tests, and isolated command execution. Required: command. Options: snapshot, image, name, repo, branch, cwd, timeout, keep, env.',
+		schema: v.object({
+			command: v.pipe(v.string(), v.minLength(1)),
+			snapshot: v.optional(v.pipe(v.string(), v.minLength(1))),
+			image: v.optional(v.pipe(v.string(), v.minLength(1))),
+			name: v.optional(v.pipe(v.string(), v.minLength(1))),
+			repo: v.optional(v.pipe(v.string(), v.minLength(1))),
+			branch: v.optional(v.pipe(v.string(), v.minLength(1))),
+			cwd: v.optional(v.pipe(v.string(), v.minLength(1))),
+			timeout: v.optional(v.number()),
+			keep: v.optional(v.boolean()),
+			env: v.optional(v.array(v.pipe(v.string(), v.minLength(1)))),
+		}),
+	},
+	async ({
+		command,
+		snapshot,
+		image,
+		name,
+		repo,
+		branch,
+		cwd,
+		timeout,
+		keep,
+		env,
+	}) => {
+		const args = ['run', '--json'];
+
+		if (snapshot) args.push('--snapshot', snapshot);
+		if (image) args.push('--image', image);
+		if (name) args.push('--name', name);
+		if (repo) args.push('--repo', repo);
+		if (branch) args.push('--branch', branch);
+		if (cwd) args.push('--cwd', cwd);
+		if (timeout !== undefined)
+			args.push('--timeout', String(timeout));
+		if (keep) args.push('--keep');
+		if (env && env.length > 0) {
+			for (const e of env) {
+				args.push('--env', e);
+			}
+		}
+		args.push('--', command);
+
+		const result = await run_cli(args, RUN_TIMEOUT_MS);
+
+		if (result.exit_code === 0) {
+			try {
+				return tool.text(
+					JSON.stringify(JSON.parse(result.stdout), null, 2),
+				);
+			} catch {
+				return tool.text(result.stdout);
+			}
+		}
+
+		try {
+			const parsed = JSON.parse(result.stdout);
+			return tool.error(JSON.stringify(parsed, null, 2));
+		} catch {
+			return tool.error(
+				`Sandbox run failed (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
 			);
 		}
 	},
@@ -307,6 +382,7 @@ const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
 	/^npm$/,
 	/^npx$/,
 	/^pnpm$/,
+	/^pnpx$/,
 	/^yarn$/,
 	/^node$/,
 	/^deno$/,

@@ -12,11 +12,12 @@ import type { CreateSandboxOptions } from './types.js';
 import { validate_sandbox_name } from './validation.js';
 
 /** Default base image for sandboxes */
-const DEFAULT_BASE_IMAGE = 'node:22-slim';
+const DEFAULT_BASE_IMAGE = 'node:22-bookworm-slim';
 
 /** Default dockerfile commands for pre-baked image */
 const DEFAULT_DOCKERFILE_COMMANDS = [
 	'RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*',
+	'RUN corepack enable && corepack prepare pnpm@latest --activate',
 	'RUN npm install -g typescript tsx',
 ];
 
@@ -25,7 +26,7 @@ const DEFAULT_TIMEOUT = 120;
 
 /**
  * Create a pre-baked image with default tools
- * @param base - Base image (default: node:22-slim)
+ * @param base - Base image (default: node:22-bookworm-slim)
  * @param additional_commands - Additional dockerfile commands to include
  * @returns Daytona Image
  */

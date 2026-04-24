@@ -46,7 +46,8 @@ export default defineCommand({
 		},
 		image: {
 			type: 'string',
-			description: 'Base Docker image (default: node:22-slim)',
+			description:
+				'Base Docker image (default: node:22-bookworm-slim)',
 		},
 		name: {
 			type: 'string',

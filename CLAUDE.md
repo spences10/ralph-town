@@ -1,29 +1,25 @@
 # Ralph-Town: Daytona Sandbox CLI
 
-CLI for managing Daytona sandboxes. Gives each Claude Code teammate
-their own isolated environment instead of sharing your filesystem.
+CLI for disposable Daytona sandboxes. Use it to run LLM evals, CLI
+smoke tests, and tooling commands in isolated cloud environments.
 
 ## Prerequisites
 
 1. **Daytona account** - https://app.daytona.io
 2. **DAYTONA_API_KEY** - https://app.daytona.io/dashboard/keys
    - Add to `.env`: `DAYTONA_API_KEY=your-key-here`
-3. **GH_TOKEN** - GitHub PAT with `repo` scope
+3. **GH_TOKEN** - GitHub PAT with `repo` scope, optional for GitHub
+   workflows inside sandboxes
    - https://github.com/settings/tokens
    - Add to `.env`: `GH_TOKEN=your-token-here`
-
-## Skills (Detailed Guides)
-
-Use `/sandbox-workflow` for teammate sandbox workflow. Use
-`/sandbox-security` for token handling, full paths, env var security.
-Use `/snapshot-management` for preflight checks and snapshot creation.
-Use `/sandbox-troubleshooting` for known issues and workarounds.
 
 ## Quick Reference
 
 ```bash
-ralph-town sandbox create --snapshot ralph-town-dev  # Create sandbox
-ralph-town sandbox ssh <id> --show-secrets           # Get SSH token
+ralph-town run -- pnpx my-pi@latest --help           # One-shot sandbox run
+ralph-town run --keep -- pnpx my-pi@latest --help    # Keep sandbox for debug
+ralph-town sandbox create --snapshot ralph-town-dev  # Create reusable sandbox
+ralph-town sandbox ssh <id> --show-secrets           # Get SSH access
 ralph-town sandbox delete <id>                       # Cleanup
 ralph-town sandbox preflight                         # Verify snapshot
 ```
@@ -34,8 +30,8 @@ ralph-town sandbox preflight                         # Verify snapshot
 packages/
 ├── cli/                 # Main CLI (ralph-town command)
 │   └── src/
-│       ├── sandbox/     # Sandbox module
-│       └── commands/    # CLI commands
+│       ├── commands/    # CLI commands
+│       └── sandbox/     # Daytona sandbox wrapper
 └── mcp-ralph-town/      # MCP server wrapping CLI
 ```
 
@@ -43,14 +39,17 @@ packages/
 
 - **snake_case** for functions/variables
 - **PascalCase** for classes
-- Prettier: tabs, single quotes, trailing commas, 70 char width
+- Vite+ formatting: tabs, single quotes, trailing commas, 70 char
+  width
 - Use pnpm
 
 ## Development
 
 ```bash
-pnpm dev          # Development mode
-pnpm run build    # Compile TypeScript
+pnpm dev
+pnpm run check
+pnpm run test
+pnpm run build
 ```
 
 ## Don't

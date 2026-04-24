@@ -1,43 +1,64 @@
 # ralph-town
 
-CLI for Daytona sandbox orchestration with Claude Code teams.
+CLI for disposable Daytona sandbox orchestration.
+
+Use it to run LLM evals, package smoke tests, and arbitrary tooling
+commands in clean remote environments without touching your local
+machine.
 
 ## Install
 
 ```bash
 npm install -g ralph-town
 # or
-npx ralph-town
+npx ralph-town --help
 ```
 
-## Features
+## One-shot runs
 
-- Create and manage Daytona sandboxes
-- SSH access to sandboxes
-- File upload/download
-- Git workflow integration
+```bash
+# Run a command in a fresh sandbox and delete it afterwards
+ralph-town run -- pnpx my-pi@latest --help
 
-## Runtimes
+# Keep the sandbox for debugging
+ralph-town run --keep -- pnpx my-pi@latest --help
 
-| Runtime        | Description            | Requirements         |
-| -------------- | ---------------------- | -------------------- |
-| `daytona`      | Cloud sandbox          | `DAYTONA_API_KEY`    |
-| `local`        | Direct shell execution | None                 |
-| `devcontainer` | Docker container       | Running devcontainer |
+# Clone a repo before running
+ralph-town run \
+	--repo https://github.com/user/project \
+	--branch main \
+	-- pnpm test
+
+# Emit machine-readable output
+ralph-town run --json -- pnpx my-pi@latest --help
+```
+
+## Sandbox commands
+
+- `sandbox create` - Create a Daytona sandbox
+- `sandbox list` - List active sandboxes
+- `sandbox ssh` - Get SSH credentials
+- `sandbox exec` - Execute a command in an existing sandbox
+- `sandbox health` - Check sandbox status and optional SSH ping
+- `sandbox delete` - Delete a sandbox
+- `sandbox env` - Manage sandbox environment variables
+- `sandbox snapshot` - Create/preflight reusable snapshots
 
 ## Environment Variables
 
-| Variable          | Required        | Description     |
-| ----------------- | --------------- | --------------- |
-| `DAYTONA_API_KEY` | runtime=daytona | Daytona API key |
-| `GH_TOKEN`        | git workflow    | GitHub token    |
+| Variable          | Required | Description                      |
+| ----------------- | -------- | -------------------------------- |
+| `DAYTONA_API_KEY` | yes      | Daytona API key                  |
+| `GH_TOKEN`        | optional | GitHub token for in-sandbox work |
 
 ## Development
 
 ```bash
-pnpm dev          # Development mode
-pnpm run build    # Compile TypeScript
-pnpm start        # Build + run compiled
+pnpm dev
+pnpm run check
+pnpm run test
+pnpm run build
+pnpm start
 ```
 
 ## Research

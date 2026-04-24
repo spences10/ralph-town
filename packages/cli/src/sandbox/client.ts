@@ -19,17 +19,16 @@ export class MissingApiKeyError extends Error {
 			`Missing ${API_KEY_ENV_VAR} environment variable.\n\n` +
 				`To fix this:\n` +
 				`  1. Get your API key from https://app.daytona.io/dashboard/keys\n` +
-				`  2. Set the environment variable:\n` +
-				`     export ${API_KEY_ENV_VAR}=your-api-key\n\n` +
-				`Or add it to your .env file:\n` +
-				`     ${API_KEY_ENV_VAR}=your-api-key`,
+				`  2. Load it into the environment before running ralph-town:\n` +
+				`     pnpx nopeek load .env --only DAYTONA_API_KEY\n` +
+				`     # or: export DAYTONA_API_KEY=your-key-here`,
 		);
 		this.name = 'MissingApiKeyError';
 	}
 }
 
 /**
- * Create a Daytona client with validated credentials
+ * Create Daytona client with API key validation
  * @throws MissingApiKeyError if DAYTONA_API_KEY is not set
  * @returns Daytona client instance
  */

@@ -1,6 +1,6 @@
 /**
  * sandbox preflight command
- * Verify snapshot has required tools before spawning teammates
+ * Verify snapshot has required tools before sandbox runs
  *
  * Uses SSH instead of sandbox.exec because exec returns -1 for
  * snapshot-based sandboxes (known issue #31)
@@ -8,7 +8,6 @@
 
 import { Daytona } from '@daytonaio/sdk';
 import { defineCommand } from 'citty';
-import 'dotenv/config';
 import { spawn } from 'node:child_process';
 
 // Tools to check with their expected paths
@@ -145,7 +144,7 @@ export default defineCommand({
 				console.log('');
 				if (all_passed) {
 					console.log('\x1b[32m✓ Preflight passed!\x1b[0m');
-					console.log('  Snapshot is ready for teammate sandboxes.');
+					console.log('  Snapshot is ready for sandbox runs.');
 				} else {
 					console.log('\x1b[31m✗ Preflight failed!\x1b[0m');
 					console.log('  Rebuild snapshot with:');

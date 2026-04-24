@@ -35,9 +35,6 @@ importers:
       citty:
         specifier: ^0.2.0
         version: 0.2.2
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.4.2
 
   packages/mcp-ralph-town:
     dependencies:

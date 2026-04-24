@@ -1,7 +1,7 @@
 {
 	"name": "ralph-town",
 	"version": "0.0.6",
-	"description": "CLI for Daytona sandbox orchestration",
+	"description": "Disposable Daytona sandboxes for LLM evals and isolated command execution",
 	"license": "MIT",
 	"author": "Scott Spence",
 	"repository": {
@@ -30,8 +30,7 @@
 	},
 	"dependencies": {
 		"@daytonaio/sdk": "0.153.0",
-		"citty": "^0.2.0",
-		"dotenv": "^17.2.3"
+		"citty": "^0.2.0"
 	},
 	"engines": {
 		"node": ">=22.12.0"
