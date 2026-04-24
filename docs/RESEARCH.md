@@ -1,343 +1,286 @@
 # Daytona Sandbox Research
 
-Research notes and findings from exploring Daytona SDK integration for
-Ralph-Town's disposable sandbox execution model.
+Current findings for Ralph-Town's disposable Daytona sandbox execution
+model.
 
----
+Last verified: 2026-04-24 against `@daytonaio/sdk@0.153.0` and the
+Daytona production API.
 
-## Problem Statement
+## Current conclusion
 
-LLM evals, CLI smoke tests, and model-generated tooling commands need
-a real environment without touching the user's local filesystem. Local
-runs create risk:
+Use Daytona's process API for `ralph-town run`, with a small wrapper
+that captures stdout, stderr, exit code, and timeout status. Keep SSH
+as a manual debugging escape hatch, not as the primary execution
+backend.
 
-- **No isolation** - commands can mutate the working tree or machine
-- **Credential exposure** - local tokens may leak to logs or
-  subprocesses
-- **Poor reproducibility** - local state affects results
-- **Cleanup burden** - failed experiments leave files and processes
-  behind
+The older assumption that `sandbox.process.executeCommand()` is broken
+on snapshot-created sandboxes is stale. In current tests,
+`executeCommand()` worked on both Daytona's default snapshot and a
+custom snapshot.
 
-**Solution**: run commands in disposable Daytona sandboxes, capture
-structured results, and delete sandboxes by default.
+## Verified Daytona SDK API surface
 
----
+### Client and sandbox creation
 
-## Key Findings
+```ts
+import { Daytona, Image } from '@daytonaio/sdk';
 
-### 1. Sandbox Creation Times
+const daytona = new Daytona(); // reads DAYTONA_API_KEY by default
 
-Tested with pre-baked Node.js image:
-
-| Sandbox | Time      | Notes               |
-| ------- | --------- | ------------------- |
-| First   | ~18s      | Builds/caches image |
-| Second  | **~1.3s** | Uses cached image   |
-| Third   | **~1.3s** | Cached              |
-
-**Conclusion**: cached sandboxes are fast enough for practical eval
-and smoke-test workflows.
-
-### 2. SSH Access Works
-
-Daytona provides token-based SSH access:
-
-```typescript
-const ssh_access = await sandbox.createSshAccess(60); // 60 min expiry
-// Returns: { token, command, expires_at }
-// Connect with: ssh <token>@ssh.app.daytona.io
+const sandbox = await daytona.create(
+	{
+		snapshot: 'daytonaio/sandbox:0.6.0',
+		name: 'my-sandbox',
+		language: 'typescript',
+		envVars: { NODE_ENV: 'test' },
+		labels: { project: 'ralph-town' },
+		autoStopInterval: 15,
+		autoArchiveInterval: 10080,
+		autoDeleteInterval: -1,
+	},
+	{ timeout: 120 },
+);
 ```
 
-**Tested and verified** - full shell access, can run arbitrary
-commands.
+Creating from an image is also supported. If the `image` is a Daytona
+`Image` object, Daytona builds a snapshot from it and then starts the
+sandbox:
 
-### 3. Pre-baked Images
+```ts
+const image = Image.base('node:22-bookworm-slim').runCommands(
+	'apt-get update && apt-get install -y git curl ca-certificates && rm -rf /var/lib/apt/lists/*',
+	'corepack enable && corepack prepare pnpm@latest --activate',
+);
 
-Default image includes:
-
-- `node:22-bookworm-slim` base
-- `git`, `curl` installed
-- `pnpm` via Corepack
-- `typescript`, `tsx` globally installed
-
-Custom images can add more tools via dockerfile commands.
-
-### 4. SDK Capabilities
-
-The `@daytonaio/sdk` provides:
-
-- `sandbox.process.executeCommand()` - Run commands
-- `sandbox.fs.uploadFile()` / `downloadFile()` - File operations
-- `sandbox.git.*` - Clone, branch, commit, push
-- `sandbox.createSshAccess()` - Get SSH credentials
-- `sandbox.delete()` - Cleanup
-
-### 5. executeCommand Limitation on Snapshots
-
-**Critical finding**: `executeCommand()` returns -1 on snapshot-based
-sandboxes. This is a known upstream issue.
-
-| Type     | Creation | executeCommand |
-| -------- | -------- | -------------- |
-| Default  | ~500ms   | Works          |
-| Snapshot | ~1.8s    | Broken (-1)    |
-
-**Recommended approach**: use SSH-backed execution for snapshot
-sandboxes. This is why `ralph-town run` executes commands over SSH.
-
----
-
-## Architecture
-
-### Disposable Sandbox Command Execution
-
+const sandbox = await daytona.create(
+	{ image, language: 'typescript' },
+	{ timeout: 120, onSnapshotCreateLogs: console.log },
+);
 ```
+
+### Snapshots
+
+```ts
+const snapshot = await daytona.snapshot.create(
+	{ name: 'my-snapshot', image },
+	{ timeout: 300, onLogs: console.log },
+);
+
+const existing = await daytona.snapshot.get('my-snapshot');
+const snapshots = await daytona.snapshot.list(1, 50);
+await daytona.snapshot.delete(existing);
+```
+
+Empirical snapshot list for this account included Daytona's active
+general snapshots:
+
+- `daytonaio/sandbox:0.6.0`
+- `daytona-small`
+- `daytona-medium`
+- `daytona-large`
+- older `daytonaio/sandbox:*` versions
+
+Inactive snapshots cannot be used until reactivated according to the
+current docs.
+
+### Process execution
+
+`executeCommand(command, cwd?, env?, timeout?)` currently executes
+shell commands and returns `{ exitCode, result, artifacts }`. It
+supports pipes and heredocs in current tests.
+
+Important limitation: `executeCommand()` returns a combined output
+stream in `result` / `artifacts.stdout`; stderr is not separated.
+Ralph-Town now wraps commands so the remote shell redirects stdout and
+stderr to temp files, base64-encodes them, and returns parseable
+markers.
+
+`executeSessionCommand()` can separate stdout and stderr, but it is
+not reliable enough as the primary backend. In current tests it worked
+for pipes and heredocs but timed out on a command that printed to both
+streams and exited non-zero, matching recent upstream reports that
+session command handling has had edge cases.
+
+### Filesystem
+
+Current TypeScript SDK supports:
+
+- `sandbox.fs.uploadFile(Buffer | localPath, remotePath, timeout?)`
+- `sandbox.fs.uploadFiles(files, timeout?)`
+- `sandbox.fs.downloadFile(remotePath, timeout?)`
+- `sandbox.fs.downloadFile(remotePath, localPath, timeout?)`
+- `sandbox.fs.downloadFiles(files, timeout?)`
+- `listFiles`, `searchFiles`, `findFiles`, `getFileDetails`,
+  `createFolder`, `deleteFile`, `moveFiles`, `replaceInFiles`, and
+  `setFilePermissions`
+
+Empirical upload/download of a small file succeeded on both default
+and custom snapshot sandboxes.
+
+### Git
+
+Current TypeScript SDK supports:
+
+- `sandbox.git.clone(url, path, branch?, commitId?, username?, password?)`
+- `add`, `commit`, `push`, `pull`, `status`
+- branch helpers such as `branches`, `createBranch`, `checkoutBranch`,
+  and `deleteBranch`
+
+Empirical clone/status against
+`https://github.com/octocat/Hello-World.git` succeeded.
+
+### Lifecycle
+
+Observed states/properties:
+
+- Sandboxes created for validation were returned as
+  `state: "started"`.
+- Default work dir for Daytona's `daytonaio/sandbox:0.6.0` is
+  `/home/daytona`.
+- `autoStopInterval: 0` disables auto-stop.
+- `autoArchiveInterval` defaulted to `10080` minutes (7 days).
+- `autoDeleteInterval: -1` disables auto-delete.
+- `ephemeral: true` is documented to set auto-delete-on-stop behavior.
+- `sandbox.delete(timeout)` deletes the sandbox, but an immediate
+  `daytona.get(id)` may still return an object while deletion
+  propagates.
+
+Available lifecycle methods include `start`, `stop`, `archive`,
+`recover`, `refreshData`, `refreshActivity`, `setAutostopInterval`,
+`setAutoArchiveInterval`, `setAutoDeleteInterval`, and `resize`.
+
+## Empirical results
+
+### `executeCommand()` on snapshot sandboxes
+
+Validated on:
+
+1. Daytona default snapshot `daytonaio/sandbox:0.6.0`
+2. A custom `node:22-bookworm-slim` snapshot with Corepack/pnpm
+
+Results:
+
+| Case                       | Default snapshot | Custom snapshot |
+| -------------------------- | ---------------- | --------------- |
+| stdout + stderr + exit 7   | exit 7           | exit 7          |
+| missing command            | exit 127         | exit 127        |
+| `bash -lc` missing command | exit 127         | exit 127        |
+| pipe                       | exit 0           | exit 0          |
+| env var from `envVars`     | available        | available       |
+| filesystem upload/download | passed           | passed          |
+| git clone/status           | passed           | passed          |
+
+Conclusion: the old `executeCommand returns -1 on snapshot sandboxes`
+claim is no longer valid for these scenarios.
+
+### SSH execution
+
+SSH access still exists via
+`sandbox.createSshAccess(expiresInMinutes)` and can be useful for
+humans debugging kept sandboxes.
+
+Empirically, SSH was not as reliable for programmatic execution:
+
+- On Daytona's default snapshot, a remote command that exited `7`
+  returned SSH exit code `255` while still producing stdout.
+- On the custom snapshot, the same command returned an unexpected
+  `127` in one test.
+- stderr handling was inconsistent in these SSH tests.
+
+Conclusion: SSH should not be the default `ralph-town run` backend.
+
+### `node:22-bookworm-slim` + Corepack/pnpm
+
+A custom snapshot based on `node:22-bookworm-slim` with:
+
+```dockerfile
+RUN apt-get update && apt-get install -y git curl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@latest --activate
+```
+
+worked as expected:
+
+- `node` was available at `/usr/local/bin/node`
+- `corepack` was available at `/usr/local/bin/corepack`
+- `pnpm` was available at `/usr/local/bin/pnpm`
+- `pnpx my-pi@latest --help` succeeded through `ralph-town run`
+
+The extra PATH edits previously baked into Ralph-Town snapshots were
+not needed for this tested custom snapshot.
+
+Daytona's default `daytonaio/sandbox:0.6.0` is different: it had Node
+`v25.6.0` via nvm/corepack but did not have `pnpm`/`pnpx` available
+until Corepack/pnpm setup was added by the image/snapshot.
+
+## Ralph-Town execution architecture
+
+Current `ralph-town run` flow:
+
+```text
 Local orchestrator
 ├── Creates Daytona sandbox
-├── Gets SSH credentials
-├── Optionally clones repository
-├── Runs command via SSH
-├── Captures stdout/stderr/exit code/duration
+├── Optionally clones a repository in the sandbox
+├── Runs a wrapped shell command via sandbox.process.executeCommand()
+├── Parses stdout, stderr, exit code, and timeout status
 └── Deletes sandbox unless --keep is set
 ```
 
-### Why This Architecture?
+The wrapper is needed because Daytona's direct command API currently
+combines stdout and stderr. The wrapper redirects each stream to a
+file in `mktemp -d`, base64-encodes both files, prints marker lines,
+and exits zero so Ralph-Town can parse the real command exit code.
 
-1. **Isolation** - each run is independent
-2. **Safety** - experiments do not touch the local machine
-3. **Reproducibility** - cleaner baseline than local developer state
-4. **Disposable** - failed attempts are deleted
-5. **Model-neutral** - CLI and MCP surfaces work for any LLM/tool
-   runner
-
----
-
-## CLI Commands
-
-### run
-
-Create a disposable sandbox, run a command, capture output, and delete
-it by default.
-
-```bash
-ralph-town run -- pnpx my-pi@latest --help
-ralph-town run --json -- pnpx my-pi@latest --help
-ralph-town run --repo https://github.com/owner/repo -- pnpm test
-ralph-town run --keep -- pnpx my-pi@latest --help
-```
-
-### sandbox create
-
-Create a reusable Daytona sandbox.
-
-```bash
-ralph-town sandbox create [options]
-```
-
-**Common flags:**
-
-| Flag                    | Description                   | Default                 |
-| ----------------------- | ----------------------------- | ----------------------- |
-| `--snapshot <name>`     | Use pre-built snapshot        | -                       |
-| `--image <image>`       | Base Docker image             | `node:22-bookworm-slim` |
-| `--name <name>`         | Sandbox name                  | auto-generated          |
-| `--auto-stop <minutes>` | Auto-stop interval in minutes | 15                      |
-| `--timeout <seconds>`   | Creation timeout in seconds   | 120                     |
-| `--env-file <path>`     | Path to .env file             | -                       |
-| `--env <KEY=VALUE>`     | Environment variables         | -                       |
-| `--json`                | Output as JSON                | false                   |
-
-### sandbox ssh
-
-Get SSH credentials for a sandbox.
-
-```bash
-ralph-town sandbox ssh <id> [--expires MINUTES]
-```
-
-### sandbox list
-
-List active sandboxes.
-
-```bash
-ralph-town sandbox list [--json]
-```
-
-### sandbox exec
-
-Execute command in an existing sandbox. Prefer `ralph-town run` for
-new disposable workloads.
-
-```bash
-ralph-town sandbox exec <id> <command>
-```
-
-### sandbox delete
-
-Delete a sandbox.
-
-```bash
-ralph-town sandbox delete <id>
-```
-
----
-
-## Snapshot Commands
-
-### Preflight
-
-Verify a snapshot has required tools before relying on it in evals or
-kept sessions.
-
-```bash
-ralph-town sandbox preflight
-ralph-town sandbox preflight --snapshot my-snapshot
-ralph-town sandbox preflight --json
-```
-
-**Tools checked:**
-
-- `/usr/bin/gh` - GitHub CLI
-- `/usr/bin/git` - Git
-- `/usr/local/bin/pnpm` - pnpm package manager
-- `/usr/bin/curl` - curl
-
-### Create Snapshot
-
-```bash
-ralph-town sandbox snapshot create
-ralph-town sandbox snapshot create --name my-snapshot
-ralph-town sandbox snapshot create --force
-ralph-town sandbox snapshot create --json
-```
-
-**Snapshot includes:**
-
-- Base image: `node:22-bookworm-slim`
-- System packages: git, curl, ca-certificates
-- GitHub CLI: gh
-- pnpm package manager: /usr/local/bin/pnpm
-- Pre-installed: @anthropic-ai/claude-agent-sdk
-- Working directory: /home/daytona
-- PATH fixes: /etc/environment, /etc/profile.d/, ~/.bashrc
-
----
-
-## Credential Workflow
+## Credentials
 
 Local orchestration credentials and sandbox credentials are
 intentionally separate.
 
-| Variable                    | Where used | Purpose                                         |
-| --------------------------- | ---------- | ----------------------------------------------- |
-| `DAYTONA_API_KEY`           | local      | Create/manage Daytona sandboxes                 |
-| `GH_TOKEN`                  | local      | Local GitHub CLI or automation                  |
-| `ANTHROPIC_API_KEY`         | local      | Local Anthropic/API calls                       |
-| `SANDBOX_GH_TOKEN`          | sandbox    | Forwarded as `GH_TOKEN` inside sandbox          |
-| `SANDBOX_ANTHROPIC_API_KEY` | sandbox    | Forwarded as `ANTHROPIC_API_KEY` inside sandbox |
+| Variable                    | Where used | Purpose                            |
+| --------------------------- | ---------- | ---------------------------------- |
+| `DAYTONA_API_KEY`           | local      | Create/manage Daytona sandboxes    |
+| `GH_TOKEN`                  | local      | Local GitHub CLI or automation     |
+| `ANTHROPIC_API_KEY`         | local      | Local Anthropic/API calls          |
+| `SANDBOX_GH_TOKEN`          | sandbox    | Forwarded as `GH_TOKEN` in sandbox |
+| `SANDBOX_ANTHROPIC_API_KEY` | sandbox    | Forwarded as `ANTHROPIC_API_KEY`   |
 
 `GITHUB_PAT` is a deprecated compatibility alias for
 `SANDBOX_GH_TOKEN`.
 
-### Passing Credentials at Sandbox Creation
+Never bake tokens into snapshots. Pass only the per-run sandbox
+secrets a command needs.
 
-```bash
-ralph-town sandbox create \
-  --snapshot ralph-town-dev \
-  --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN" \
-  --env "SANDBOX_ANTHROPIC_API_KEY=$SANDBOX_ANTHROPIC_API_KEY"
-```
+## MCP execution policy notes
 
-Inside the sandbox these are available as `$GH_TOKEN` and
-`$ANTHROPIC_API_KEY`.
+`mcp-ralph-town` currently exposes both:
 
-### Secure Git Workflow
+- `sandbox_run`: one-shot disposable execution. This is the safer
+  default because it creates and deletes a fresh sandbox for the
+  command.
+- `sandbox_exec`: command execution in an existing sandbox with a
+  static allowlist.
 
-Avoid embedding tokens in git URLs. Use credential helper only when
-push or private repository access is needed:
+The static allowlist is only a partial guard. For model-neutral
+sandbox orchestration, a better policy would likely distinguish
+between:
 
-```bash
-/usr/bin/git config --global credential.helper store
-/bin/printf 'https://oauth2:%s@github.com\n' "$GH_TOKEN" > ~/.git-credentials
-/bin/chmod 600 ~/.git-credentials
-```
+1. Disposable one-shot runs, where arbitrary commands are expected and
+   the sandbox is deleted by default.
+2. Long-lived sandbox sessions, where command policy may need explicit
+   user/client approval, labels, rate limits, audit logs, and
+   configurable deny/allow rules.
 
-Security considerations:
+## Sources checked
 
-1. **Never bake tokens into snapshots** - pass at runtime via `--env`
-2. **Use credential helper** - never embed tokens in git URLs
-3. **Env vars are visible in sandbox** - pass only what the run needs
-4. **Use scoped tokens** - minimum permissions
-5. **Sandboxes are ephemeral** - credentials disappear when deleted
-
----
-
-## Workflow Example
-
-```bash
-# One-shot CLI eval
-ralph-town run --json -- pnpx my-pi@latest --help
-
-# Repository smoke test
-ralph-town run \
-  --repo https://github.com/user/repo \
-  -- pnpm test
-
-# Kept debug session
-ralph-town sandbox create --snapshot ralph-town-dev --json
-ralph-town sandbox ssh <id> --show-secrets
-ssh <token>@ssh.app.daytona.io
-ralph-town sandbox delete <id>
-```
-
----
-
-## MCP Tools
-
-The MCP server exposes tools for model-neutral sandbox orchestration:
-
-- `sandbox_run` - Create sandbox, run command, delete by default
-- `sandbox_create` - Create sandbox, returns ID
-- `sandbox_ssh` - Get SSH credentials
-- `sandbox_list` - List active sandboxes
-- `sandbox_exec` - Run command in existing sandbox
-- `sandbox_delete` - Delete sandbox
-- `sandbox_env_list` / `sandbox_env_set` - Manage sandbox env vars
-
----
-
-## Sandbox Resources
-
-Default sandbox specs:
-
-- **CPU**: 1 core
-- **Memory**: 1 GB
-- **Disk**: 3 GB
-- **Auto-stop**: 15 minutes idle
-- **Auto-archive**: 7 days
-
----
-
-## Upstream Issues
-
-Daytona issues affecting this project:
-
-- [#2283](https://github.com/daytonaio/daytona/issues/2283) -
-  executeCommand returns -1 on snapshot sandboxes
-- [#2535](https://github.com/daytonaio/daytona/issues/2535) - Snapshot
-  DX improvements
-
----
-
-## References
-
-### External
-
-- [Daytona SDK](https://github.com/daytonaio/daytona)
-- [Daytona Docs](https://www.daytona.io/docs)
-
-### Internal
-
-- `packages/cli/src/sandbox/` - Sandbox module
-- `packages/cli/src/commands/run.ts` - Disposable run command
-- `packages/cli/src/commands/sandbox/` - Sandbox management commands
+- Daytona docs: `https://www.daytona.io/docs/en/sandboxes/`
+- Daytona docs: `https://www.daytona.io/docs/en/snapshots/`
+- Daytona docs:
+  `https://www.daytona.io/docs/en/process-code-execution/`
+- Daytona TypeScript SDK docs for `Daytona`, `Sandbox`, `Process`,
+  `FileSystem`, and `Git`
+- Local installed `@daytonaio/sdk@0.153.0` `.d.ts` files
+- GitHub issue `daytonaio/daytona#2283` — still open, but its current
+  scope is missing-command exit behavior; current empirical tests
+  returned exit 127, not -1
+- GitHub issue `daytonaio/daytona#4230` — session command hanging edge
+  cases; closed, but session execution still showed timeout behavior
+  in local validation

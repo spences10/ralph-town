@@ -1,6 +1,6 @@
 /**
  * sandbox snapshot create command
- * Create the ralph-town-dev snapshot with Node.js, pnpm, and Claude Agent SDK pre-installed
+ * Create the ralph-town-dev snapshot with Node.js, pnpm, and common CLI tooling pre-installed
  */
 
 import { Daytona, Image } from '@daytonaio/sdk';
@@ -12,7 +12,7 @@ export default defineCommand({
 	meta: {
 		name: 'create',
 		description:
-			'Create a snapshot with Node.js, pnpm, and Claude Agent SDK pre-installed',
+			'Create a snapshot with Node.js, pnpm, gh, git, and common CLI tooling pre-installed',
 	},
 	args: {
 		name: {
@@ -76,7 +76,7 @@ export default defineCommand({
 			// Snapshot doesn't exist, continue
 		}
 
-		// Build image with Node.js, pnpm, Claude Agent SDK + gh CLI
+		// Build image with Node.js, pnpm, git, and gh CLI
 		const image = Image.base('node:22-bookworm-slim')
 			.runCommands(
 				// Install dependencies
@@ -90,16 +90,15 @@ export default defineCommand({
 				'corepack enable && corepack prepare pnpm@latest --activate',
 				// Create working directory
 				'mkdir -p /home/daytona',
-				// Fix PATH for SSH sessions
+				// Keep SSH debugging sessions on the same PATH as process API runs
 				'echo "PATH=/usr/local/bin:/usr/bin:/bin" > /etc/environment',
 				'echo "export PATH=/usr/local/bin:/usr/bin:/bin:\\$PATH" > /etc/profile.d/path.sh',
 				'echo "export PATH=/usr/local/bin:/usr/bin:/bin:\\$PATH" >> /root/.bashrc',
 			)
 			.workdir('/home/daytona')
 			.runCommands(
-				// Initialize project and install Agent SDK
-				'/usr/local/bin/pnpm init -y',
-				'/usr/local/bin/pnpm add @anthropic-ai/claude-agent-sdk',
+				// Initialize a minimal workspace so pnpm is ready for smoke tests
+				'pnpm init -y',
 			);
 
 		if (!args.json) {

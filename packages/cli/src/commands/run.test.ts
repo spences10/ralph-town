@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+	build_exec_wrapper,
 	build_remote_command,
 	command_from_raw_args,
+	parse_exec_wrapper_output,
 } from './run.js';
 
 describe('command_from_raw_args', () => {
@@ -24,6 +26,44 @@ describe('command_from_raw_args', () => {
 		expect(
 			command_from_raw_args(['--', 'sh', '-lc', 'echo hi && pwd']),
 		).toBe("'sh' '-lc' 'echo hi && pwd'");
+	});
+});
+
+describe('exec wrapper', () => {
+	it('builds a wrapper that hides command output behind markers', () => {
+		const wrapper = build_exec_wrapper({
+			command: 'printf "out"; printf "err" >&2; exit 7',
+			timeout_sec: 120,
+			marker: '__RT__',
+		});
+
+		expect(wrapper).toContain('__RT__EXIT:%s');
+		expect(wrapper).toContain('__RT__STDOUT:');
+		expect(wrapper).toContain('__RT__STDERR:');
+		expect(wrapper).toContain("timeout '120s'");
+		expect(wrapper).not.toContain('printf "out"');
+	});
+
+	it('parses marked stdout, stderr, and exit code', () => {
+		const output = [
+			'__RT__EXIT:7',
+			`__RT__STDOUT:${Buffer.from('out').toString('base64')}`,
+			`__RT__STDERR:${Buffer.from('err').toString('base64')}`,
+			'__RT__END',
+		].join('\n');
+
+		expect(
+			parse_exec_wrapper_output({
+				output,
+				marker: '__RT__',
+				timeout_sec: 120,
+			}),
+		).toEqual({
+			exit_code: 7,
+			stdout: 'out',
+			stderr: 'err',
+			timed_out: false,
+		});
 	});
 });
 

@@ -4,7 +4,6 @@
  */
 
 import { defineCommand } from 'citty';
-import { spawn } from 'node:child_process';
 import { dirname } from 'node:path';
 import {
 	normalize_sandbox_env,
@@ -24,7 +23,7 @@ import {
 	SdkError,
 } from '../sandbox/index.js';
 
-interface SshExecResult {
+interface ExecResult {
 	exit_code: number;
 	stdout: string;
 	stderr: string;
@@ -81,69 +80,116 @@ export function build_remote_command(options: {
 	};
 }
 
-async function ssh_exec(options: {
-	token: string;
+export function parse_exec_wrapper_output(options: {
+	output: string;
+	marker: string;
+	timeout_sec: number;
+}): ExecResult {
+	const exit_match = options.output.match(
+		new RegExp(`${options.marker}EXIT:(\\d+)`),
+	);
+	const stdout_match = options.output.match(
+		new RegExp(`${options.marker}STDOUT:([^\\n]*)`),
+	);
+	const stderr_match = options.output.match(
+		new RegExp(`${options.marker}STDERR:([^\\n]*)`),
+	);
+
+	if (!exit_match || !stdout_match || !stderr_match) {
+		return {
+			exit_code: 1,
+			stdout: '',
+			stderr: `Could not parse Daytona execution output:\n${options.output}`,
+			timed_out: false,
+		};
+	}
+
+	const exit_code = Number.parseInt(exit_match[1] ?? '1', 10);
+	const stdout = Buffer.from(
+		stdout_match[1] ?? '',
+		'base64',
+	).toString('utf-8');
+	const stderr = Buffer.from(
+		stderr_match[1] ?? '',
+		'base64',
+	).toString('utf-8');
+	const timed_out = exit_code === 124;
+
+	return {
+		exit_code,
+		stdout,
+		stderr: timed_out
+			? `Command timed out after ${options.timeout_sec}s\n${stderr}`
+			: stderr,
+		timed_out,
+	};
+}
+
+export function build_exec_wrapper(options: {
 	command: string;
-	timeout_ms: number;
-}): Promise<SshExecResult> {
-	return new Promise((resolve) => {
-		const proc = spawn(
-			'ssh',
-			[
-				'-o',
-				'StrictHostKeyChecking=no',
-				'-o',
-				'BatchMode=yes',
-				`${options.token}@ssh.app.daytona.io`,
-				options.command,
-			],
-			{ stdio: ['ignore', 'pipe', 'pipe'] },
+	timeout_sec: number;
+	marker: string;
+}): string {
+	const command_b64 = Buffer.from(options.command, 'utf-8').toString(
+		'base64',
+	);
+	const timeout_arg = `${options.timeout_sec}s`;
+
+	return [
+		`command_b64=${shell_escape(command_b64)}`,
+		'tmp_dir=$(mktemp -d)',
+		'cleanup() { rm -rf "$tmp_dir"; }',
+		'trap cleanup EXIT',
+		'printf %s "$command_b64" | base64 -d > "$tmp_dir/command.sh"',
+		'chmod +x "$tmp_dir/command.sh"',
+		'set +e',
+		`if command -v timeout >/dev/null 2>&1; then timeout ${shell_escape(timeout_arg)} /bin/sh "$tmp_dir/command.sh" > "$tmp_dir/stdout" 2> "$tmp_dir/stderr"; else /bin/sh "$tmp_dir/command.sh" > "$tmp_dir/stdout" 2> "$tmp_dir/stderr"; fi`,
+		'exit_code=$?',
+		`printf ${shell_escape(`${options.marker}EXIT:%s\\n`)} "$exit_code"`,
+		`printf ${shell_escape(`${options.marker}STDOUT:`)}`,
+		'base64 "$tmp_dir/stdout" | tr -d "\\n"',
+		'printf "\\n"',
+		`printf ${shell_escape(`${options.marker}STDERR:`)}`,
+		'base64 "$tmp_dir/stderr" | tr -d "\\n"',
+		'printf "\\n"',
+		`printf ${shell_escape(`${options.marker}END\\n`)}`,
+		'exit 0',
+	].join('; ');
+}
+
+async function sandbox_exec(options: {
+	sandbox: Sandbox;
+	command: string;
+	timeout_sec: number;
+}): Promise<ExecResult> {
+	const marker = `__RALPH_TOWN_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
+	const wrapper = build_exec_wrapper({
+		command: options.command,
+		timeout_sec: options.timeout_sec,
+		marker,
+	});
+
+	try {
+		const result = await options.sandbox.raw.process.executeCommand(
+			wrapper,
+			undefined,
+			undefined,
+			options.timeout_sec + 30,
 		);
 
-		let stdout = '';
-		let stderr = '';
-		let timed_out = false;
-
-		const timeout_id = setTimeout(() => {
-			timed_out = true;
-			proc.kill('SIGTERM');
-			setTimeout(() => {
-				if (!proc.killed) {
-					proc.kill('SIGKILL');
-				}
-			}, 5000);
-		}, options.timeout_ms);
-
-		proc.stdout?.on('data', (data) => {
-			stdout += data.toString();
+		return parse_exec_wrapper_output({
+			output: result.result,
+			marker,
+			timeout_sec: options.timeout_sec,
 		});
-
-		proc.stderr?.on('data', (data) => {
-			stderr += data.toString();
-		});
-
-		proc.on('close', (code) => {
-			clearTimeout(timeout_id);
-			resolve({
-				exit_code: timed_out ? 124 : (code ?? 1),
-				stdout,
-				stderr: timed_out
-					? `Command timed out after ${options.timeout_ms}ms\n${stderr}`
-					: stderr,
-				timed_out,
-			});
-		});
-
-		proc.on('error', (error) => {
-			clearTimeout(timeout_id);
-			resolve({
-				exit_code: 1,
-				stdout: '',
-				stderr: error.message,
-				timed_out: false,
-			});
-		});
-	});
+	} catch (error) {
+		return {
+			exit_code: 124,
+			stdout: '',
+			stderr: `Command timed out after ${options.timeout_sec}s\n${error instanceof Error ? error.message : String(error)}`,
+			timed_out: true,
+		};
+	}
 }
 
 async function cleanup_sandbox(
@@ -308,19 +354,16 @@ export default defineCommand({
 					Object.keys(env_vars).length > 0 ? env_vars : undefined,
 			});
 
-			const access = await sandbox.get_ssh_access(
-				Math.max(5, Math.ceil(timeout / 60) + 5),
-			);
 			const remote = build_remote_command({
 				command,
 				repo: args.repo,
 				branch: args.branch,
 				cwd: args.cwd,
 			});
-			const result = await ssh_exec({
-				token: access.token,
+			const result = await sandbox_exec({
+				sandbox,
 				command: remote.command,
-				timeout_ms: timeout * 1000,
+				timeout_sec: timeout,
 			});
 
 			if (!args.keep) {

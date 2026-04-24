@@ -1,6 +1,6 @@
 /**
  * Sandbox Module
- * Clean interface for Daytona sandbox operations with SSH support
+ * Clean interface for Daytona sandbox operations
  */
 
 export {

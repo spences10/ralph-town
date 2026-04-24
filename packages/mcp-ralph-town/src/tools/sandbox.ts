@@ -155,7 +155,7 @@ export const sandbox_run_tool = defineTool(
 	{
 		name: 'sandbox_run',
 		description:
-			'Create a fresh Daytona sandbox, run a command via SSH, and delete it by default. Best for LLM evals, CLI smoke tests, and isolated command execution. Required: command. Options: snapshot, image, name, repo, branch, cwd, timeout, keep, env.',
+			'Create a fresh Daytona sandbox, run a command, and delete it by default. Best for LLM evals, CLI smoke tests, and isolated command execution. Required: command. Options: snapshot, image, name, repo, branch, cwd, timeout, keep, env.',
 		schema: v.object({
 			command: v.pipe(v.string(), v.minLength(1)),
 			snapshot: v.optional(v.pipe(v.string(), v.minLength(1))),

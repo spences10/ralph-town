@@ -31,9 +31,9 @@ ralph-town run \
 ralph-town run --json -- pnpx my-pi@latest --help
 ```
 
-`run` creates a sandbox, executes the command over SSH, captures
-stdout/stderr/exit code, and deletes the sandbox unless `--keep` is
-set.
+`run` creates a sandbox, executes the command through Daytona's
+process API, captures stdout/stderr/exit code, and deletes the sandbox
+unless `--keep` is set.
 
 ## Install
 

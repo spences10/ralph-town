@@ -2,8 +2,8 @@
  * sandbox preflight command
  * Verify snapshot has required tools before sandbox runs
  *
- * Uses SSH instead of sandbox.exec because exec returns -1 for
- * snapshot-based sandboxes (known issue #31)
+ * Uses SSH to verify the same manual-debugging path exposed by
+ * `sandbox ssh`. Disposable `run` uses Daytona's process API instead.
  */
 
 import { Daytona } from '@daytonaio/sdk';

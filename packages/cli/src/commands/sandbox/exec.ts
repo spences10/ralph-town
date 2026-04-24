@@ -4,6 +4,7 @@
  */
 
 import { defineCommand } from 'citty';
+import { parse_int_flag_or_exit } from '../../core/utils.js';
 import {
 	BaseCliError,
 	create_daytona_client,
@@ -12,7 +13,6 @@ import {
 	SdkError,
 	wrap_sdk_call,
 } from '../../sandbox/index.js';
-import { parse_int_flag_or_exit } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -75,10 +75,9 @@ export default defineCommand({
 				args.id,
 			);
 
-			// KNOWN ISSUE: executeCommand returns exit code -1 with empty
-			// stdout on snapshot-based sandboxes. This is a Daytona SDK bug.
-			// Workaround: Use SSH instead (see sandbox ssh command).
-			// Upstream issue: https://github.com/daytonaio/daytona/issues/2283
+			// executeCommand currently returns combined command output in
+			// result/artifacts.stdout. The disposable `run` command wraps
+			// execution to recover separate stdout/stderr streams.
 			const result = await wrap_sdk_call(() =>
 				sandbox.process.executeCommand(
 					args.cmd,
