@@ -1,5 +1,12 @@
 # ralph-town
 
+## 0.0.8
+
+### Patch Changes
+
+- eb9c77c: Switch disposable sandbox runs from SSH execution to
+  Daytona process API with reliable output parsing.
+
 ## 0.0.7
 
 ### Patch Changes

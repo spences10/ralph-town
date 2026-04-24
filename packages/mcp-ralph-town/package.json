@@ -1,6 +1,6 @@
 {
 	"name": "mcp-ralph-town",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "MCP server for disposable Daytona sandbox orchestration",
 	"license": "MIT",
 	"author": "Scott Spence",
