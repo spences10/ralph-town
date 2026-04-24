@@ -46,10 +46,16 @@ ralph-town run --json -- pnpx my-pi@latest --help
 
 ## Environment Variables
 
-| Variable          | Required | Description                      |
-| ----------------- | -------- | -------------------------------- |
-| `DAYTONA_API_KEY` | yes      | Daytona API key                  |
-| `GH_TOKEN`        | optional | GitHub token for in-sandbox work |
+| Variable                    | Context            | Description                                             |
+| --------------------------- | ------------------ | ------------------------------------------------------- |
+| `DAYTONA_API_KEY`           | local orchestrator | Daytona API key                                         |
+| `GH_TOKEN`                  | local orchestrator | Optional GitHub token for local commands                |
+| `ANTHROPIC_API_KEY`         | local orchestrator | Optional Anthropic key for local commands               |
+| `SANDBOX_GH_TOKEN`          | sandbox            | Optional GitHub token forwarded as `GH_TOKEN`           |
+| `SANDBOX_ANTHROPIC_API_KEY` | sandbox            | Optional Anthropic key forwarded as `ANTHROPIC_API_KEY` |
+
+`GITHUB_PAT` remains supported as a deprecated alias for
+`SANDBOX_GH_TOKEN`.
 
 ## Development
 

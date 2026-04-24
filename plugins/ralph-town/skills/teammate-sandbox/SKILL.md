@@ -9,7 +9,7 @@ description: Spawn teammates in isolated Daytona sandboxes. Use when assigning i
 ## Quick Start
 
 ```bash
-source .env  # Load GH_TOKEN
+source .env  # Load SANDBOX_GH_TOKEN
 
 # 1. Create sandbox
 ralph-town sandbox create --snapshot ralph-town-dev
@@ -30,7 +30,7 @@ ssh <token>@ssh.app.daytona.io "
 
 ## Critical Rules
 
-**Quoting matters** - `$GH_TOKEN` must expand LOCALLY:
+**Quoting matters** - `$SANDBOX_GH_TOKEN` must expand LOCALLY:
 
 - GOOD: `ssh ... "...echo '....$GH_TOKEN@...'..."` (double outside)
 - BAD: `ssh ... '...echo "....$GH_TOKEN@..."...'` (single outside)

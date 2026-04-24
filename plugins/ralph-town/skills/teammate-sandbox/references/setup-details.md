@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-1. `GH_TOKEN` in `.env` (GitHub PAT with `repo` scope)
+1. `SANDBOX_GH_TOKEN` in `.env` (GitHub PAT with `repo` scope)
 2. `DAYTONA_API_KEY` in `.env`
 3. Snapshot ready: `ralph-town sandbox preflight`
 
@@ -11,7 +11,7 @@
 ### 1. Source Environment
 
 ```bash
-source .env  # Makes $GH_TOKEN available locally
+source .env  # Makes $SANDBOX_GH_TOKEN available locally
 ```
 
 ### 2. Create Sandbox
@@ -42,7 +42,7 @@ ssh <token>@ssh.app.daytona.io "
 
 **Why this works:**
 
-- Double quotes on outside allow `$GH_TOKEN` to expand locally
+- Double quotes on outside allow `$SANDBOX_GH_TOKEN` to expand locally
 - Single quotes inside protect the URL from shell interpretation
 - Credential helper stores creds securely on disk
 

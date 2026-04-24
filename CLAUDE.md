@@ -8,10 +8,12 @@ smoke tests, and tooling commands in isolated cloud environments.
 1. **Daytona account** - https://app.daytona.io
 2. **DAYTONA_API_KEY** - https://app.daytona.io/dashboard/keys
    - Add to `.env`: `DAYTONA_API_KEY=your-key-here`
-3. **GH_TOKEN** - GitHub PAT with `repo` scope, optional for GitHub
-   workflows inside sandboxes
-   - https://github.com/settings/tokens
-   - Add to `.env`: `GH_TOKEN=your-token-here`
+3. Optional scoped tokens
+   - `GH_TOKEN` / `ANTHROPIC_API_KEY`: local orchestrator use
+   - `SANDBOX_GH_TOKEN`: forwarded into sandboxes as `GH_TOKEN`
+   - `SANDBOX_ANTHROPIC_API_KEY`: forwarded into sandboxes as
+     `ANTHROPIC_API_KEY`
+   - `GITHUB_PAT` is a deprecated alias for `SANDBOX_GH_TOKEN`
 
 ## Quick Reference
 

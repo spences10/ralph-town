@@ -39,7 +39,7 @@ Env vars via `--env` are visible to ALL processes in sandbox:
 
 - `env` command lists everything
 - `/proc/*/environ` exposes all process env vars
-- Any script/binary can read `$GH_TOKEN`
+- Any script/binary can read `$GH_TOKEN` inside the sandbox
 
 **Mitigations:**
 
@@ -52,7 +52,7 @@ Env vars via `--env` are visible to ALL processes in sandbox:
 Team-lead configures credentials BEFORE spawning teammate:
 
 ```bash
-# $GH_TOKEN expands LOCALLY (double quotes!)
+# $SANDBOX_GH_TOKEN expands LOCALLY (double quotes!)
 ssh <token>@ssh.app.daytona.io "
   /usr/bin/git config --global credential.helper store &&
   /bin/echo 'https://oauth2:$GH_TOKEN@github.com' > ~/.git-credentials &&

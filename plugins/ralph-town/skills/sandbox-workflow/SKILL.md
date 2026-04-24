@@ -9,7 +9,7 @@ description: Use for teammate sandbox operations - SSH access, git workflow, ful
 ## Team-Lead Quick Start
 
 ```bash
-source .env  # Load GH_TOKEN
+source .env  # Load SANDBOX_GH_TOKEN
 
 # 1. Create sandbox
 ralph-town sandbox create --snapshot ralph-town-dev
@@ -56,7 +56,7 @@ cd repo
 
 **Work directory:** `/home/daytona` (not /workspaces)
 
-**Quoting:** `$GH_TOKEN` must expand locally:
+**Quoting:** `$SANDBOX_GH_TOKEN` must expand locally:
 
 - GOOD: `ssh ... "...echo '...$GH_TOKEN@...'..."`
 - BAD: `ssh ... '...echo "...$GH_TOKEN@..."...'`

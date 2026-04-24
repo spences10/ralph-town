@@ -41,7 +41,7 @@ expand unless sourced first.
 
 ```bash
 # $GH_TOKEN is in .env but not exported - expands to empty string
-ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
+ralph-town sandbox create --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
 # Sandbox created with GH_TOKEN="" (empty!)
 ```
 
@@ -50,7 +50,7 @@ ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
 ```bash
 # Source .env first so variables are in shell environment
 source .env
-ralph-town sandbox create --env "GH_TOKEN=$GH_TOKEN"
+ralph-town sandbox create --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
 # Sandbox created with actual token value
 ```
 

@@ -137,7 +137,7 @@ false |
 ralph-town sandbox create
 
 # With snapshot and env vars
-ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+ralph-town sandbox create --snapshot ralph-town-dev --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
 
 # Custom image with timeout
 ralph-town sandbox create --image ubuntu:22.04 --timeout 180
@@ -268,10 +268,10 @@ Here is how to set it up.
 Use `--env` to inject environment variables:
 
 ```bash
-# Pass GH_TOKEN for git push/PR workflow
+# Pass sandbox-scoped GitHub token for git push/PR workflow
 ralph-town sandbox create \
   --snapshot ralph-town-dev \
-  --env "GH_TOKEN=$GH_TOKEN"
+  --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
 ```
 
 The token is then available inside the sandbox as `$GH_TOKEN`.
@@ -345,7 +345,7 @@ ralph-town sandbox preflight
 # => Preflight passed!
 
 # 2. Team lead creates sandbox for teammate
-ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN"
+ralph-town sandbox create --snapshot ralph-town-dev --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
 # => Sandbox ID: abc123
 
 # 3. Get SSH access

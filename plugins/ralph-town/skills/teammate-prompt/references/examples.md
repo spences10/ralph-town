@@ -68,7 +68,7 @@ cd ralph-town
 /usr/bin/git checkout -b docs/104-standardize-env-vars
 
 ## Implementation
-Standardize on GH_TOKEN everywhere. This is now complete (GH_TOKEN is standard).
+Use SANDBOX_GH_TOKEN locally and GH_TOKEN inside sandboxes. This is now complete (GH_TOKEN is standard inside sandboxes).
 
 Files to update:
 - CLAUDE.md
@@ -76,7 +76,7 @@ Files to update:
 - Any references in docs/
 
 ## After Completing
-1. /usr/bin/git add -A && /usr/bin/git commit -m "docs: standardize on GH_TOKEN"
+1. /usr/bin/git add -A && /usr/bin/git commit -m "docs: clarify sandbox GitHub token naming"
 2. /usr/bin/git push -u origin docs/104-standardize-env-vars
 3. /usr/bin/gh pr create --title "docs: standardize env var naming" --body "Fixes #104"
 4. Mark task #2 completed + send PR URL to team-lead

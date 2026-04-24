@@ -4,7 +4,11 @@
  */
 
 import { defineCommand } from 'citty';
-import * as fs from 'node:fs';
+import {
+	normalize_sandbox_env,
+	parse_env_file,
+	parse_env_flags,
+} from '../../core/env.js';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
 import type { Sandbox } from '../../sandbox/index.js';
 import {
@@ -16,18 +20,6 @@ import {
 } from '../../sandbox/index.js';
 
 const REDACTED = '***REDACTED***';
-
-function parse_env_file(path: string): Record<string, string> {
-	const content = fs.readFileSync(path, 'utf-8');
-	const env: Record<string, string> = {};
-	for (const line of content.split('\n')) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith('#')) continue;
-		const [key, ...rest] = trimmed.split('=');
-		if (key) env[key] = rest.join('=');
-	}
-	return env;
-}
 
 function mask_token(token: string): string {
 	if (token.length <= 4) return '****';
@@ -103,15 +95,10 @@ export default defineCommand({
 		}
 
 		// Parse env vars from --env flag (takes precedence over file)
-		if (args.env) {
-			const parts = args.env.split(',');
-			for (const part of parts) {
-				const [key, ...valueParts] = part.trim().split('=');
-				if (key && valueParts.length > 0) {
-					env_vars[key] = valueParts.join('=');
-				}
-			}
-		}
+		env_vars = normalize_sandbox_env({
+			...env_vars,
+			...parse_env_flags(args.env),
+		});
 		const auto_stop = args['auto-stop']
 			? parse_int_flag_or_exit(
 					args['auto-stop'],

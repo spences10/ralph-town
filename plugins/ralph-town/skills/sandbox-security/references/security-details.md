@@ -85,7 +85,7 @@ Double quotes = expand locally. Single quotes = literal string.
 SSH sessions don't inherit `--env` vars from sandbox creation. The
 team-lead must:
 
-1. Source `.env` locally to get `$GH_TOKEN`
+1. Source `.env` locally to get `$SANDBOX_GH_TOKEN`
 2. Run SSH command with double quotes
 3. Token expands locally before being sent to remote
 
@@ -107,7 +107,7 @@ ralph-town sandbox ssh <sandbox-id> --show-secrets
 # Returns: ssh <token>@ssh.app.daytona.io
 
 # 4. Configure credentials via SSH
-# Note: $GH_TOKEN expands LOCALLY
+# Note: $SANDBOX_GH_TOKEN expands LOCALLY
 ssh <token>@ssh.app.daytona.io "
   /usr/bin/git config --global credential.helper store &&
   /bin/echo 'https://oauth2:$GH_TOKEN@github.com' > ~/.git-credentials &&

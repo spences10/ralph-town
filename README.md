@@ -1,5 +1,8 @@
 # ralph-town
 
+[![built with vite+](https://img.shields.io/badge/built%20with-Vite+-646CFF?logo=vite&logoColor=white)](https://viteplus.dev)
+[![tested with vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
+
 Disposable Daytona sandboxes for LLM evals, CLI smoke tests, and
 isolated command execution.
 
@@ -89,11 +92,18 @@ ralph-town run --json -- pnpx my-pi@latest --help
 }
 ```
 
-## Requirements
+## Environment variables
 
-- `DAYTONA_API_KEY` - Get from [daytona.io](https://daytona.io)
-- `GH_TOKEN` - Optional, only needed for GitHub workflows inside the
-  sandbox
+| Variable                    | Context            | Description                                                            |
+| --------------------------- | ------------------ | ---------------------------------------------------------------------- |
+| `DAYTONA_API_KEY`           | local orchestrator | Daytona API key from [daytona.io](https://daytona.io)                  |
+| `GH_TOKEN`                  | local orchestrator | Optional GitHub token for commands run locally                         |
+| `ANTHROPIC_API_KEY`         | local orchestrator | Optional Anthropic key for commands run locally                        |
+| `SANDBOX_GH_TOKEN`          | sandbox            | Optional GitHub token forwarded into sandboxes as `GH_TOKEN`           |
+| `SANDBOX_ANTHROPIC_API_KEY` | sandbox            | Optional Anthropic key forwarded into sandboxes as `ANTHROPIC_API_KEY` |
+
+`GITHUB_PAT` is still accepted as a deprecated compatibility alias for
+`SANDBOX_GH_TOKEN`.
 
 ## Packages
 

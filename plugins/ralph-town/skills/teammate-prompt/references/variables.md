@@ -23,9 +23,9 @@
 ### SSH Token & Sandbox ID
 
 ```bash
-# Create sandbox (GH_TOKEN injected into sandbox env)
+# Create sandbox (SANDBOX_GH_TOKEN injected into sandbox env)
 source .env
-ralph-town sandbox create --snapshot ralph-town-dev --env "GH_TOKEN=$GH_TOKEN" --json
+ralph-town sandbox create --snapshot ralph-town-dev --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN" --json
 # Returns: {"id":"...", "state":"started"}
 
 # Get SSH token
@@ -46,4 +46,4 @@ ralph-town sandbox ssh <sandbox-id> --json
 2. **Never pass literal tokens** - Use sandbox env vars, not hardcoded
    values
 3. **SSH token != GH_TOKEN** - SSH token is for Daytona access,
-   GH_TOKEN is for GitHub
+   GH_TOKEN is for GitHub inside the sandbox

@@ -5,8 +5,12 @@
 
 import { defineCommand } from 'citty';
 import { spawn } from 'node:child_process';
-import * as fs from 'node:fs';
 import { dirname } from 'node:path';
+import {
+	normalize_sandbox_env,
+	parse_env_file,
+	parse_env_flags,
+} from '../core/env.js';
 import {
 	parse_int_flag_or_exit,
 	shell_escape,
@@ -30,32 +34,6 @@ interface SshExecResult {
 interface CleanupResult {
 	deleted: boolean;
 	error?: string;
-}
-
-function parse_env_file(path: string): Record<string, string> {
-	const content = fs.readFileSync(path, 'utf-8');
-	const env: Record<string, string> = {};
-	for (const line of content.split('\n')) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith('#')) continue;
-		const [key, ...rest] = trimmed.split('=');
-		if (key) env[key] = rest.join('=');
-	}
-	return env;
-}
-
-function parse_env_flags(
-	value: string | undefined,
-): Record<string, string> {
-	if (!value) return {};
-	const env: Record<string, string> = {};
-	for (const part of value.split(',')) {
-		const [key, ...value_parts] = part.trim().split('=');
-		if (key && value_parts.length > 0) {
-			env[key] = value_parts.join('=');
-		}
-	}
-	return env;
 }
 
 export function command_from_raw_args(
@@ -283,7 +261,10 @@ export default defineCommand({
 				return;
 			}
 		}
-		env_vars = { ...env_vars, ...parse_env_flags(args.env) };
+		env_vars = normalize_sandbox_env({
+			...env_vars,
+			...parse_env_flags(args.env),
+		});
 
 		const timeout = parse_int_flag_or_exit(
 			args.timeout,
