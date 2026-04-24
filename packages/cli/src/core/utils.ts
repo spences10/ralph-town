@@ -50,7 +50,8 @@ export function parse_int_flag_or_exit(
 	try {
 		return parse_int_flag(value, flag_name, default_value);
 	} catch (error) {
-		const msg = error instanceof Error ? error.message : String(error);
+		const msg =
+			error instanceof Error ? error.message : String(error);
 		if (json_output) {
 			console.error(JSON.stringify({ error: msg }));
 		} else {

@@ -4,6 +4,7 @@
  */
 
 import { defineCommand } from 'citty';
+import { parse_int_flag_or_exit } from '../../core/utils.js';
 import {
 	BaseCliError,
 	create_daytona_client,
@@ -12,7 +13,6 @@ import {
 	SdkError,
 	wrap_sdk_call,
 } from '../../sandbox/index.js';
-import { parse_int_flag_or_exit } from '../../core/utils.js';
 
 export default defineCommand({
 	meta: {
@@ -22,7 +22,8 @@ export default defineCommand({
 	args: {
 		limit: {
 			type: 'string',
-			description: 'Maximum number of sandboxes to return (default: 20)',
+			description:
+				'Maximum number of sandboxes to return (default: 20)',
 		},
 		json: {
 			type: 'boolean',

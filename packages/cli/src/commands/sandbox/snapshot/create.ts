@@ -1,17 +1,18 @@
 /**
  * sandbox snapshot create command
- * Create the ralph-town-dev snapshot with Bun + Claude Agent SDK pre-installed
+ * Create the ralph-town-dev snapshot with Node.js, pnpm, and Claude Agent SDK pre-installed
  */
 
-import { defineCommand } from 'citty';
 import { Daytona, Image } from '@daytonaio/sdk';
+import { defineCommand } from 'citty';
 
 const DEFAULT_SNAPSHOT_NAME = 'ralph-town-dev';
 
 export default defineCommand({
 	meta: {
 		name: 'create',
-		description: 'Create a snapshot with Bun + Claude Agent SDK pre-installed',
+		description:
+			'Create a snapshot with Node.js, pnpm, and Claude Agent SDK pre-installed',
 	},
 	args: {
 		name: {
@@ -64,7 +65,9 @@ export default defineCommand({
 						}),
 					);
 				} else {
-					console.log(`Snapshot already exists (state: ${existing.state})`);
+					console.log(
+						`Snapshot already exists (state: ${existing.state})`,
+					);
 					console.log('Use --force to delete and recreate.');
 				}
 				return;
@@ -73,8 +76,8 @@ export default defineCommand({
 			// Snapshot doesn't exist, continue
 		}
 
-		// Build image with Bun + Claude Agent SDK + gh CLI
-		const image = Image.base('debian:bookworm-slim')
+		// Build image with Node.js, pnpm, Claude Agent SDK + gh CLI
+		const image = Image.base('node:22-bookworm-slim')
 			.runCommands(
 				// Install dependencies
 				'apt-get update && apt-get install -y curl unzip git ca-certificates',
@@ -83,21 +86,20 @@ export default defineCommand({
 				'chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg',
 				'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null',
 				'apt-get update && apt-get install -y gh',
-				// Install Bun
-				'curl -fsSL https://bun.sh/install | bash',
+				// Enable pnpm via Corepack
+				'corepack enable && corepack prepare pnpm@latest --activate',
 				// Create working directory
 				'mkdir -p /home/daytona',
 				// Fix PATH for SSH sessions
-				'echo "PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin" > /etc/environment',
-				'echo "export PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin:\\$PATH" > /etc/profile.d/path.sh',
-				'echo "export PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin:\\$PATH" >> /root/.bashrc',
+				'echo "PATH=/usr/local/bin:/usr/bin:/bin" > /etc/environment',
+				'echo "export PATH=/usr/local/bin:/usr/bin:/bin:\\$PATH" > /etc/profile.d/path.sh',
+				'echo "export PATH=/usr/local/bin:/usr/bin:/bin:\\$PATH" >> /root/.bashrc',
 			)
-			.env({ PATH: '/root/.bun/bin:$PATH' })
 			.workdir('/home/daytona')
 			.runCommands(
 				// Initialize project and install Agent SDK
-				'/root/.bun/bin/bun init -y',
-				'/root/.bun/bin/bun add @anthropic-ai/claude-agent-sdk',
+				'/usr/local/bin/pnpm init -y',
+				'/usr/local/bin/pnpm add @anthropic-ai/claude-agent-sdk',
 			);
 
 		if (!args.json) {
@@ -108,7 +110,9 @@ export default defineCommand({
 			const snapshot = await daytona.snapshot.create(
 				{ name: snapshot_name, image },
 				{
-					onLogs: args.json ? undefined : (chunk) => process.stdout.write(chunk),
+					onLogs: args.json
+						? undefined
+						: (chunk) => process.stdout.write(chunk),
 					timeout: 300,
 				},
 			);
@@ -130,7 +134,10 @@ export default defineCommand({
 		} catch (error) {
 			if (args.json) {
 				console.error(
-					JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+					JSON.stringify({
+						error:
+							error instanceof Error ? error.message : String(error),
+					}),
 				);
 			} else {
 				console.error('\nFailed to create snapshot:', error);

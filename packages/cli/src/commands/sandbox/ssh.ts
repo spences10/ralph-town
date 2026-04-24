@@ -4,6 +4,7 @@
  */
 
 import { defineCommand } from 'citty';
+import { parse_int_flag_or_exit } from '../../core/utils.js';
 import {
 	BaseCliError,
 	create_daytona_client,
@@ -12,7 +13,6 @@ import {
 	SdkError,
 	wrap_sdk_call,
 } from '../../sandbox/index.js';
-import { parse_int_flag_or_exit } from '../../core/utils.js';
 
 export const REDACTED = '***REDACTED***';
 
@@ -82,15 +82,12 @@ export default defineCommand({
 			const show_secrets = args['show-secrets'];
 
 			if (args.json) {
-				const display_token = show_secrets
-					? access.token
-					: REDACTED;
+				const display_token = show_secrets ? access.token : REDACTED;
 				console.log(
 					JSON.stringify({
 						token: display_token,
 						token_masked: !show_secrets,
-						command:
-							'ssh ' + display_token + '@ssh.app.daytona.io',
+						command: 'ssh ' + display_token + '@ssh.app.daytona.io',
 						expires_at: new Date(
 							Date.now() + expires_minutes * 60 * 1000,
 						).toISOString(),
@@ -101,13 +98,9 @@ export default defineCommand({
 					console.log('SSH Access for sandbox ' + args.id);
 					console.log('Token: ' + access.token);
 					console.log(
-						'Command: ssh ' +
-							access.token +
-							'@ssh.app.daytona.io',
+						'Command: ssh ' + access.token + '@ssh.app.daytona.io',
 					);
-					console.log(
-						'Expires in: ' + expires_minutes + ' minutes',
-					);
+					console.log('Expires in: ' + expires_minutes + ' minutes');
 				} else {
 					const masked = mask_token(access.token);
 					console.log('SSH Access for sandbox ' + args.id);
@@ -119,9 +112,7 @@ export default defineCommand({
 					console.log(
 						'Command: ssh ' + masked + '@ssh.app.daytona.io',
 					);
-					console.log(
-						'Expires in: ' + expires_minutes + ' minutes',
-					);
+					console.log('Expires in: ' + expires_minutes + ' minutes');
 				}
 			}
 		} catch (error) {

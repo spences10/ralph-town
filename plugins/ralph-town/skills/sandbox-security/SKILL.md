@@ -10,16 +10,17 @@ description: Daytona sandbox security. Use for token handling, credential securi
 
 SSH sessions have broken PATH. ALWAYS use full paths:
 
-| Tool | Path |
-|------|------|
-| git | `/usr/bin/git` |
-| gh | `/usr/bin/gh` |
-| bun | `/root/.bun/bin/bun` |
+| Tool        | Path                               |
+| ----------- | ---------------------------------- |
+| git         | `/usr/bin/git`                     |
+| gh          | `/usr/bin/gh`                      |
+| pnpm        | `/usr/local/bin/pnpm`              |
 | ls/cat/echo | `/bin/ls`, `/bin/cat`, `/bin/echo` |
 
 ## Token Handling
 
-**NEVER embed tokens in URLs** - they leak to process list, logs, errors.
+**NEVER embed tokens in URLs** - they leak to process list, logs,
+errors.
 
 ```bash
 # BAD - token visible in ps, logs, error messages
@@ -35,11 +36,13 @@ SSH sessions have broken PATH. ALWAYS use full paths:
 ## Env Var Visibility
 
 Env vars via `--env` are visible to ALL processes in sandbox:
+
 - `env` command lists everything
 - `/proc/*/environ` exposes all process env vars
 - Any script/binary can read `$GH_TOKEN`
 
 **Mitigations:**
+
 - Only pass credentials the sandbox legitimately needs
 - Use short-lived, minimally-scoped tokens
 - Delete sandbox promptly after use

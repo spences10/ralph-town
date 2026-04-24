@@ -11,12 +11,12 @@ import { Daytona, Image } from '@daytonaio/sdk';
 const image = Image.base('debian:bookworm-slim')
 	.runCommands(
 		'apt-get update && apt-get install -y curl unzip git',
-		'curl -fsSL https://bun.sh/install | bash',
+		'corepack enable && corepack prepare pnpm@latest --activate',
 	)
-	.env({ PATH: '/root/.bun/bin:$PATH' })
+	.env({ PATH: '$PATH' })
 	.workdir('/home/daytona')
 	.runCommands(
-		'/root/.bun/bin/bun add @anthropic-ai/claude-agent-sdk',
+		'/usr/local/bin/pnpm add @anthropic-ai/claude-agent-sdk',
 	);
 
 const snapshot = await daytona.snapshot.create(
@@ -32,16 +32,16 @@ const sandbox = await daytona.create({
 	snapshot: 'my-snapshot',
 	language: 'typescript',
 });
-// Sandbox has Bun + Agent SDK ready instantly
+// Sandbox has pnpm + Agent SDK ready instantly
 ```
 
 ## ralph-town-dev Snapshot
 
-Pre-built snapshot with Bun, TypeScript, and Claude Agent SDK:
+Pre-built snapshot with pnpm, TypeScript, and Claude Agent SDK:
 
 ```bash
 # Create snapshot (run once, ~3 min)
-bun run packages/cli/src/core/create-snapshot.ts
+ralph-town sandbox snapshot create
 
 # Use via CLI
 ralph-town sandbox create --snapshot ralph-town-dev
@@ -50,15 +50,13 @@ ralph-town sandbox create --snapshot ralph-town-dev
 **Note:** Snapshots are pre-built images (like Dockerfiles), not live
 VM checkpoints. Define tooling upfront, build once, use many times.
 
-## Installing Bun Without Snapshots (Tier 3+ only)
+## Installing pnpm Without Snapshots (Tier 3+ only)
 
 ```typescript
 await sandbox.process.executeCommand(
-	'curl -fsSL https://bun.sh/install | bash',
+	'corepack enable && corepack prepare pnpm@latest --activate',
 );
-await sandbox.process.executeCommand(
-	'export PATH="$HOME/.bun/bin:$PATH" && bun install',
-);
+await sandbox.process.executeCommand('pnpm install');
 ```
 
 **Better approach:** Use snapshots to avoid install overhead.
@@ -71,8 +69,7 @@ When using `sandbox.process.executeCommand()` on sandboxes created
 from snapshots, the exit code is always `-1` regardless of actual
 command success/failure.
 
-**Upstream issue:**
-https://github.com/daytonaio/daytona/issues/2283
+**Upstream issue:** https://github.com/daytonaio/daytona/issues/2283
 
 **Workaround options:**
 

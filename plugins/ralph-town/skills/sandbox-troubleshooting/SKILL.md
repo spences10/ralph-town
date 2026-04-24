@@ -8,15 +8,16 @@ description: Daytona sandbox troubleshooting. Use for known issues, common mista
 
 ## Known Issues
 
-| Issue | Workaround |
-|-------|------------|
-| SSH PATH broken | Use full paths: `/usr/bin/git`, `/usr/bin/gh` |
-| `exec` returns -1 on snapshots | Use SSH instead (Daytona bug #2283) |
-| Work dir is `/home/daytona` | Not /workspaces |
-| SSH exit code 255 | Ignore - check output, not exit code |
-| `--env` vars not in SSH | Team-lead sets credentials before spawning |
+| Issue                          | Workaround                                    |
+| ------------------------------ | --------------------------------------------- |
+| SSH PATH broken                | Use full paths: `/usr/bin/git`, `/usr/bin/gh` |
+| `exec` returns -1 on snapshots | Use SSH instead (Daytona bug #2283)           |
+| Work dir is `/home/daytona`    | Not /workspaces                               |
+| SSH exit code 255              | Ignore - check output, not exit code          |
+| `--env` vars not in SSH        | Team-lead sets credentials before spawning    |
 
-Upstream: [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
+Upstream:
+[daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
 
 ## Common Mistakes
 
@@ -25,7 +26,7 @@ Upstream: [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2
 - BAD: `ralph-town sandbox create`
 - GOOD: `ralph-town sandbox create --snapshot ralph-town-dev`
 
-Snapshot has gh, git, bun pre-installed.
+Snapshot has gh, git, pnpm pre-installed.
 
 ### 2. Using exec instead of SSH
 
@@ -68,10 +69,10 @@ Tokens in URLs leak to process list, logs, error messages.
 
 ## Full Path Reference
 
-| Tool | Path |
-|------|------|
-| git | `/usr/bin/git` |
-| gh | `/usr/bin/gh` |
-| bun | `/root/.bun/bin/bun` |
+| Tool          | Path                               |
+| ------------- | ---------------------------------- |
+| git           | `/usr/bin/git`                     |
+| gh            | `/usr/bin/gh`                      |
+| pnpm          | `/usr/local/bin/pnpm`              |
 | ls, cat, echo | `/bin/ls`, `/bin/cat`, `/bin/echo` |
-| curl | `/usr/bin/curl` |
+| curl          | `/usr/bin/curl`                    |

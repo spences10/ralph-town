@@ -1,6 +1,7 @@
 ---
 name: sandbox
-description: Manage Daytona sandboxes for isolated teammate environments
+description:
+  Manage Daytona sandboxes for isolated teammate environments
 ---
 
 # Sandbox Skill
@@ -10,26 +11,31 @@ Manage Daytona sandboxes for isolated teammate environments.
 ## Commands
 
 ### Create Sandbox
+
 ```bash
 ralph-town sandbox create --name <name> --env "GH_TOKEN=..."
 ```
 
 ### List Sandboxes
+
 ```bash
 ralph-town sandbox list
 ```
 
 ### Get SSH Access
+
 ```bash
 ralph-town sandbox ssh <id>
 ```
 
 ### Execute Command
+
 ```bash
 ralph-town sandbox exec <id> -- <command>
 ```
 
 ### Delete Sandbox
+
 ```bash
 ralph-town sandbox delete <id>
 ```
@@ -46,17 +52,17 @@ ralph-town sandbox delete <id>
 ## SSH Tips
 
 PATH is broken in SSH sessions. Use full paths:
+
 ```bash
-ssh <token>@ssh.app.daytona.io "export PATH=/usr/bin:/bin:/root/.bun/bin:\$PATH && <command>"
+ssh <token>@ssh.app.daytona.io "export PATH=/usr/bin:/bin:\$PATH && <command>"
 ```
 
 Or prefix commands with `/usr/bin/` or `/bin/`.
 
 ## Known Issues
 
-| Issue | Workaround |
-|-------|------------|
-| `exec` returns -1 | Use SSH instead ([upstream#2283](https://github.com/daytonaio/daytona/issues/2283)) |
-| `gh` not installed | `apt-get install -y gh` in sandbox |
-| PATH broken in SSH | Use full paths |
-
+| Issue              | Workaround                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `exec` returns -1  | Use SSH instead ([upstream#2283](https://github.com/daytonaio/daytona/issues/2283)) |
+| `gh` not installed | `apt-get install -y gh` in sandbox                                                  |
+| PATH broken in SSH | Use full paths                                                                      |

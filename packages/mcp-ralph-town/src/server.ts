@@ -1,15 +1,15 @@
 import { ValibotJsonSchemaAdapter } from '@tmcp/adapter-valibot';
 import { McpServer } from 'tmcp';
+import pkg from '../package.json' with { type: 'json' };
 import {
 	sandbox_create_tool,
-	sandbox_list_tool,
-	sandbox_ssh_tool,
 	sandbox_delete_tool,
-	sandbox_exec_tool,
 	sandbox_env_list_tool,
 	sandbox_env_set_tool,
+	sandbox_exec_tool,
+	sandbox_list_tool,
+	sandbox_ssh_tool,
 } from './tools/index.js';
-import pkg from '../package.json' with { type: 'json' };
 
 export function create_server() {
 	const adapter = new ValibotJsonSchemaAdapter();
@@ -18,8 +18,7 @@ export function create_server() {
 		{
 			name: 'mcp-ralph-town',
 			version: pkg.version,
-			description:
-				'MCP server for Daytona sandbox management',
+			description: 'MCP server for Daytona sandbox management',
 		},
 		{
 			adapter,

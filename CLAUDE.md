@@ -14,8 +14,8 @@ their own isolated environment instead of sharing your filesystem.
 
 ## Skills (Detailed Guides)
 
-Use `/sandbox-workflow` for teammate sandbox workflow.
-Use `/sandbox-security` for token handling, full paths, env var security.
+Use `/sandbox-workflow` for teammate sandbox workflow. Use
+`/sandbox-security` for token handling, full paths, env var security.
 Use `/snapshot-management` for preflight checks and snapshot creation.
 Use `/sandbox-troubleshooting` for known issues and workarounds.
 
@@ -44,13 +44,13 @@ packages/
 - **snake_case** for functions/variables
 - **PascalCase** for classes
 - Prettier: tabs, single quotes, trailing commas, 70 char width
-- Use Bun, not npm/pnpm
+- Use pnpm
 
 ## Development
 
 ```bash
-bun dev          # Development mode
-bun run build    # Compile TypeScript
+pnpm dev          # Development mode
+pnpm run build    # Compile TypeScript
 ```
 
 ## Don't

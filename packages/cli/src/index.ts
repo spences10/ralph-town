@@ -5,8 +5,8 @@
  */
 
 import { defineCommand, runMain } from 'citty';
-import sandbox from './commands/sandbox/index.js';
 import pkg from '../package.json' with { type: 'json' };
+import sandbox from './commands/sandbox/index.js';
 
 const main = defineCommand({
 	meta: {
@@ -19,4 +19,4 @@ const main = defineCommand({
 	},
 });
 
-runMain(main);
+void runMain(main);

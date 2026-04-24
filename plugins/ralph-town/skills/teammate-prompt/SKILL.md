@@ -20,7 +20,7 @@ Generate prompts for teammates working in Daytona sandboxes.
 1. **Sandbox-only** - NEVER use local Read/Write/Edit tools
 2. **Fail fast** - INFRA failures=stop, CODE failures=retry once
 3. **Full paths** - `/usr/bin/git`, `/usr/bin/gh`,
-   `/root/.bun/bin/bun`
+   `/usr/local/bin/pnpm`
 
 ## References
 

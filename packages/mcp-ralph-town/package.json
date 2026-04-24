@@ -1,37 +1,41 @@
 {
 	"name": "mcp-ralph-town",
 	"version": "0.0.2",
-	"type": "module",
 	"description": "MCP server wrapping Ralph Loop CLI",
-	"bin": {
-		"mcp-ralph-town": "./dist/index.js"
-	},
-	"main": "dist/index.js",
-	"files": [
-		"dist",
-		"README.md"
-	],
-	"author": "Scott Spence",
 	"license": "MIT",
+	"author": "Scott Spence",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/spences10/ralph-town.git",
 		"directory": "packages/mcp-ralph-town"
 	},
+	"bin": {
+		"mcp-ralph-town": "./dist/index.js"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"type": "module",
+	"main": "dist/index.js",
 	"scripts": {
-		"build": "tsc",
-		"dev": "bun src/index.ts",
-		"typecheck": "tsc --noEmit"
+		"build": "vp pack",
+		"dev": "vp pack --watch",
+		"start": "node ./dist/index.js",
+		"check": "vp check",
+		"check:fix": "vp check --fix",
+		"format": "vp check --fix",
+		"test": "vp test",
+		"test:watch": "vp test watch"
 	},
 	"dependencies": {
-		"tmcp": "^1.19.2",
 		"@tmcp/adapter-valibot": "^0.1.5",
 		"@tmcp/transport-stdio": "*",
-		"valibot": "^1.2.0",
-		"ralph-town": "^0.0.6"
+		"ralph-town": "workspace:*",
+		"tmcp": "^1.19.2",
+		"valibot": "^1.2.0"
 	},
-	"devDependencies": {
-		"@types/node": "^25.0.10",
-		"typescript": "^5.9.3"
+	"engines": {
+		"node": ">=22.12.0"
 	}
 }

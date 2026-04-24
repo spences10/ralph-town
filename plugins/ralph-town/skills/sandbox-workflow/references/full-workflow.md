@@ -49,15 +49,15 @@ cd repo
 
 ## Full Path Reference
 
-| Tool | Full Path |
-|------|-----------|
-| git | `/usr/bin/git` |
-| gh | `/usr/bin/gh` |
-| bun | `/root/.bun/bin/bun` |
-| curl | `/usr/bin/curl` |
-| ls | `/bin/ls` |
-| cat | `/bin/cat` |
-| echo | `/bin/echo` |
+| Tool | Full Path             |
+| ---- | --------------------- |
+| git  | `/usr/bin/git`        |
+| gh   | `/usr/bin/gh`         |
+| pnpm | `/usr/local/bin/pnpm` |
+| curl | `/usr/bin/curl`       |
+| ls   | `/bin/ls`             |
+| cat  | `/bin/cat`            |
+| echo | `/bin/echo`           |
 
 ## PR Best Practices
 
@@ -78,5 +78,5 @@ Known bug with snapshots. Always use SSH, not exec.
 
 ### Credentials Not Working
 
-Credentials are set up by team-lead BEFORE spawning you. If they
-don't work, report to team-lead immediately - don't try to fix.
+Credentials are set up by team-lead BEFORE spawning you. If they don't
+work, report to team-lead immediately - don't try to fix.

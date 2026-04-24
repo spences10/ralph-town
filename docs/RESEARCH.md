@@ -1,7 +1,7 @@
 # Daytona Sandbox Research
 
-Research notes and findings from exploring Daytona SDK integration
-for Claude Code teams.
+Research notes and findings from exploring Daytona SDK integration for
+Claude Code teams.
 
 ---
 
@@ -26,11 +26,11 @@ share the same filesystem. This creates problems:
 
 Tested with pre-baked Node.js image:
 
-| Sandbox | Time | Notes |
-|---------|------|-------|
-| First | ~18s | Builds/caches image |
-| Second | **~1.3s** | Uses cached image |
-| Third | **~1.3s** | Cached |
+| Sandbox | Time      | Notes               |
+| ------- | --------- | ------------------- |
+| First   | ~18s      | Builds/caches image |
+| Second  | **~1.3s** | Uses cached image   |
+| Third   | **~1.3s** | Cached              |
 
 **Conclusion**: 14x speedup after first run. Cached sandboxes are fast
 enough for practical use.
@@ -50,6 +50,7 @@ const ssh_access = await sandbox.createSshAccess(60); // 60 min expiry
 ### 3. Pre-baked Images
 
 Default image includes:
+
 - `node:22-slim` base
 - `git`, `curl` installed
 - `typescript`, `tsx` globally installed
@@ -71,10 +72,10 @@ The `@daytonaio/sdk` provides:
 **Critical finding**: `executeCommand()` returns -1 on snapshot-based
 sandboxes. This is a known upstream issue.
 
-| Type | Creation | executeCommand |
-|------|----------|----------------|
-| Default | ~500ms | Works |
-| Snapshot | ~1.8s | Broken (-1) |
+| Type     | Creation | executeCommand |
+| -------- | -------- | -------------- |
+| Default  | ~500ms   | Works          |
+| Snapshot | ~1.8s    | Broken (-1)    |
 
 **Recommended approach**: Use default sandbox + runtime tool install
 instead of snapshots when executeCommand is needed. SSH works on both.
@@ -119,19 +120,18 @@ Create a new Daytona sandbox.
 ralph-town sandbox create [options]
 ```
 
-**Flags:**
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--snapshot <name>` | Use pre-built snapshot | - |
-| `--image <image>` | Base Docker image | `node:22-slim` |
-| `--name <name>` | Sandbox name | auto-generated |
-| `--auto-stop <minutes>` | Auto-stop interval in minutes | 15 |
-| `--timeout <seconds>` | Creation timeout in seconds | 120 |
-| `--env-file <path>` | Path to .env file | - |
-| `--env <KEY=VALUE>` | Environment variable (repeatable) | - |
-| `--json` | Output as JSON | false |
+**Flags:** | Flag | Description | Default |
+|------|-------------|---------| | `--snapshot <name>` | Use pre-built
+snapshot | - | | `--image <image>` | Base Docker image |
+`node:22-slim` | | `--name <name>` | Sandbox name | auto-generated | |
+`--auto-stop <minutes>` | Auto-stop interval in minutes | 15 | |
+`--timeout <seconds>` | Creation timeout in seconds | 120 | |
+`--env-file <path>` | Path to .env file | - | | `--env <KEY=VALUE>` |
+Environment variable (repeatable) | - | | `--json` | Output as JSON |
+false |
 
 **Examples:**
+
 ```bash
 # Basic sandbox
 ralph-town sandbox create
@@ -191,16 +191,19 @@ ralph-town sandbox preflight --json
 ```
 
 **Flags:**
+
 - `--snapshot <name>` - Snapshot to test (default: ralph-town-dev)
 - `--json` - Output as JSON
 
 **Tools checked:**
+
 - `/usr/bin/gh` - GitHub CLI
 - `/usr/bin/git` - Git
-- `/root/.bun/bin/bun` - Bun runtime
+- `/usr/local/bin/pnpm` - pnpm package manager
 - `/usr/bin/curl` - curl
 
 **How it works:**
+
 1. Creates a temporary sandbox from the snapshot
 2. Gets SSH credentials
 3. Checks each tool exists via SSH (`/bin/test -x <path>`)
@@ -208,7 +211,8 @@ ralph-town sandbox preflight --json
 5. Reports pass/fail
 
 **Use case:** Run before spawning teammates to catch snapshot issues
-early. If preflight fails, rebuild snapshot with `sandbox snapshot create --force`.
+early. If preflight fails, rebuild snapshot with
+`sandbox snapshot create --force`.
 
 ### Snapshot Commands
 
@@ -229,15 +233,17 @@ ralph-town sandbox snapshot create --json
 ```
 
 **Flags:**
+
 - `--name <name>` - Snapshot name (default: ralph-town-dev)
 - `--force` - Delete existing snapshot and recreate
 - `--json` - Output as JSON
 
 **What the snapshot includes:**
+
 - Base image: `debian:bookworm-slim`
 - System packages: git, curl, ca-certificates
 - GitHub CLI: gh (for PR creation)
-- Bun runtime: /root/.bun/bin/bun
+- pnpm package manager: /usr/local/bin/pnpm
 - Pre-installed: @anthropic-ai/claude-agent-sdk
 - Working directory: /home/daytona
 - PATH fixes: /etc/environment, /etc/profile.d/, ~/.bashrc
@@ -245,6 +251,7 @@ ralph-town sandbox snapshot create --json
 **Build time:** ~2-3 minutes
 
 **When to rebuild:**
+
 - After changing tool requirements
 - If preflight fails
 - To update SDK version
@@ -286,8 +293,9 @@ git clone https://github.com/user/repo.git
 git push -u origin feature-branch
 ```
 
-**Why not embed token in URL?**
-Tokens in URLs like `git clone https://$TOKEN@github.com/...` leak via:
+**Why not embed token in URL?** Tokens in URLs like
+`git clone https://$TOKEN@github.com/...` leak via:
+
 - Process list (`ps aux` shows full command line)
 - Shell history
 - Error messages and logs
@@ -317,11 +325,11 @@ gh pr create --title "Feature X" --body "Description"
 
 ### Known Issues & Workarounds
 
-| Issue | Workaround |
-|-------|------------|
-| `sandbox exec` returns -1 on snapshot sandboxes | Use SSH instead |
-| SSH PATH broken (commands not found) | Use full paths: `/usr/bin/git` |
-| Preflight fails | Rebuild snapshot with `--force` |
+| Issue                                           | Workaround                      |
+| ----------------------------------------------- | ------------------------------- |
+| `sandbox exec` returns -1 on snapshot sandboxes | Use SSH instead                 |
+| SSH PATH broken (commands not found)            | Use full paths: `/usr/bin/git`  |
+| Preflight fails                                 | Rebuild snapshot with `--force` |
 
 ### Future Improvements
 
@@ -394,18 +402,20 @@ Daytona issues affecting this project:
 
 - [#2283](https://github.com/daytonaio/daytona/issues/2283) -
   executeCommand returns -1 on snapshot sandboxes
-- [#2535](https://github.com/daytonaio/daytona/issues/2535) -
-  Snapshot DX improvements
+- [#2535](https://github.com/daytonaio/daytona/issues/2535) - Snapshot
+  DX improvements
 
 ---
 
 ## References
 
 ### External
+
 - [Daytona SDK](https://github.com/daytonaio/daytona)
 - [Daytona Docs](https://www.daytona.io/docs)
 
 ### Internal
+
 - `packages/cli/src/sandbox/` - Sandbox module
 - `packages/cli/src/commands/sandbox/` - CLI commands
 - `packages/cli/src/commands/sandbox/preflight.ts` - Preflight command

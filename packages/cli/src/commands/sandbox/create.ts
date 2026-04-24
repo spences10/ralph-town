@@ -3,8 +3,10 @@
  * Create a new Daytona sandbox with pre-baked image
  */
 
-import * as fs from 'fs';
 import { defineCommand } from 'citty';
+import * as fs from 'node:fs';
+import { parse_int_flag_or_exit } from '../../core/utils.js';
+import type { Sandbox } from '../../sandbox/index.js';
 import {
 	BaseCliError,
 	create_sandbox,
@@ -12,8 +14,6 @@ import {
 	output_error,
 	SdkError,
 } from '../../sandbox/index.js';
-import { parse_int_flag_or_exit } from '../../core/utils.js';
-import type { Sandbox } from '../../sandbox/index.js';
 
 const REDACTED = '***REDACTED***';
 
@@ -120,7 +120,12 @@ export default defineCommand({
 				)
 			: undefined;
 		const timeout = args.timeout
-			? parse_int_flag_or_exit(args.timeout, 'timeout', 120, args.json)
+			? parse_int_flag_or_exit(
+					args.timeout,
+					'timeout',
+					120,
+					args.json,
+				)
 			: undefined;
 
 		if (!args.json) {
@@ -169,8 +174,7 @@ export default defineCommand({
 					output.ssh = {
 						token: display_token,
 						token_masked: !show_secrets,
-						command:
-							'ssh ' + display_token + '@ssh.app.daytona.io',
+						command: 'ssh ' + display_token + '@ssh.app.daytona.io',
 					};
 				}
 				console.log(JSON.stringify(output));
@@ -185,9 +189,7 @@ export default defineCommand({
 					const show_secrets = args['show-secrets'];
 					if (show_secrets) {
 						console.log(
-							'SSH: ssh ' +
-								ssh_info.token +
-								'@ssh.app.daytona.io',
+							'SSH: ssh ' + ssh_info.token + '@ssh.app.daytona.io',
 						);
 					} else {
 						const masked = mask_token(ssh_info.token);

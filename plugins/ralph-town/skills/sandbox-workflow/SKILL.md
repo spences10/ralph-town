@@ -50,22 +50,26 @@ cd repo
 ## Critical Rules
 
 **Full paths required** - SSH PATH is broken:
-- `/usr/bin/git`, `/usr/bin/gh`, `/root/.bun/bin/bun`
+
+- `/usr/bin/git`, `/usr/bin/gh`, `/usr/local/bin/pnpm`
 - `/bin/ls`, `/bin/cat`, `/bin/echo`
 
 **Work directory:** `/home/daytona` (not /workspaces)
 
 **Quoting:** `$GH_TOKEN` must expand locally:
+
 - GOOD: `ssh ... "...echo '...$GH_TOKEN@...'..."`
 - BAD: `ssh ... '...echo "...$GH_TOKEN@..."...'`
 
 ## Fail Fast (Teammates)
 
 If sandbox fails:
+
 1. Report error to team-lead immediately
 2. DO NOT attempt workarounds
 3. DO NOT keep retrying - wasting tokens
 
 ## References
 
-- [references/full-workflow.md](references/full-workflow.md) - Complete details
+- [references/full-workflow.md](references/full-workflow.md) -
+  Complete details

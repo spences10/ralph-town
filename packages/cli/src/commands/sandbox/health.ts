@@ -4,7 +4,7 @@
  */
 
 import { defineCommand } from 'citty';
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import {
 	BaseCliError,
 	create_daytona_client,
@@ -67,7 +67,8 @@ export default defineCommand({
 		},
 		ping: {
 			type: 'boolean',
-			description: 'Also ping sandbox via SSH (slower but verifies connectivity)',
+			description:
+				'Also ping sandbox via SSH (slower but verifies connectivity)',
 		},
 		json: {
 			type: 'boolean',
@@ -130,7 +131,10 @@ export default defineCommand({
 				id: sandbox_id,
 				state,
 				healthy: is_running,
-				...(do_ping && { ping: ping_ok, latency_ms: ping_latency_ms }),
+				...(do_ping && {
+					ping: ping_ok,
+					latency_ms: ping_latency_ms,
+				}),
 			};
 
 			if (json_output) {
@@ -153,7 +157,10 @@ export default defineCommand({
 			}
 		} catch (error) {
 			if (is_sandbox_not_found(error)) {
-				output_error(new SandboxNotFoundError(sandbox_id), json_output);
+				output_error(
+					new SandboxNotFoundError(sandbox_id),
+					json_output,
+				);
 				return;
 			}
 			if (error instanceof BaseCliError) {

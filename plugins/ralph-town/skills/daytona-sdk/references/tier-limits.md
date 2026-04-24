@@ -5,11 +5,11 @@
 | Internet access       | Restricted (npm only) | Full      |
 | Snapshot creation     | Forbidden             | Available |
 | curl to external URLs | Blocked               | Allowed   |
-| bun.sh install        | Fails                 | Works     |
+| corepack/pnpm setup   | Available             | Available |
 
 ## Preview Tier Workaround
 
-Use npm/node instead of bun:
+Use Node.js package-manager commands:
 
 ```typescript
 await sandbox.process.executeCommand(
@@ -31,5 +31,5 @@ await sandbox.process.executeCommand(
 
 ## Notes
 
-- PR #3241 adds Bun + Claude Agent SDK to default image (pending)
-- Issue #3238 tracks native Bun support request
+- PR #3241 adds Node.js, pnpm + Claude Agent SDK to default image
+  (pending)

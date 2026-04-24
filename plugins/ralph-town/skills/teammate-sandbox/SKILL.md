@@ -31,12 +31,14 @@ ssh <token>@ssh.app.daytona.io "
 ## Critical Rules
 
 **Quoting matters** - `$GH_TOKEN` must expand LOCALLY:
+
 - GOOD: `ssh ... "...echo '....$GH_TOKEN@...'..."` (double outside)
 - BAD: `ssh ... '...echo "....$GH_TOKEN@..."...'` (single outside)
 
 **Never embed tokens in URLs** - use credential helper instead
 
-**Always use snapshot** - `--snapshot ralph-town-dev` has tools pre-installed
+**Always use snapshot** - `--snapshot ralph-town-dev` has tools
+pre-installed
 
 ## Preflight Check
 
@@ -53,4 +55,5 @@ ralph-town sandbox delete <id>  # Delete when teammate done
 
 ## References
 
-- [references/setup-details.md](references/setup-details.md) - Full setup guide
+- [references/setup-details.md](references/setup-details.md) - Full
+  setup guide

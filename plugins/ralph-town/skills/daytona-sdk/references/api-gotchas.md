@@ -9,6 +9,7 @@ When working in a sandbox via SSH:
 3. **WORK DIR** - `/home/daytona` not `/workspaces`
 
 **JUST RUN:**
+
 ```bash
 cd /home/daytona
 
@@ -21,18 +22,20 @@ echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
 ```
 
 **DON'T WASTE TIME ON:**
+
 - `echo $GH_TOKEN` - it's there, trust it
 - `which git` - PATH is broken, use full paths
 - checking if commands exist - just run them
 
 **DON'T PUT TOKEN IN URL:**
+
 - BAD: `git clone https://$GH_TOKEN@github.com/...` (leaks to logs)
 - GOOD: Use credential helper as shown above
 
 ## CLI: Environment Variables Must Be Sourced
 
-The `--env` flag uses shell expansion. Variables in `.env` won't expand
-unless sourced first.
+The `--env` flag uses shell expansion. Variables in `.env` won't
+expand unless sourced first.
 
 **WRONG:**
 
@@ -79,7 +82,7 @@ export enum CodeLanguage {
 }
 ```
 
-No `bun`, `go`, `rust`, etc.
+No non-standard runtimes beyond the supported language enum values.
 
 ## Research Commands
 
@@ -102,10 +105,9 @@ gh pr view <number> --repo daytonaio/daytona
 mcp__mcp-omnisearch__github_search query="repo:daytonaio/daytona <term>"
 ```
 
-## Bun Support Status
+## Default Image Status
 
-- **Issue #3238**: "Add bun to default Daytona Snapshot" (open)
-- **PR #3241**: Adds Bun + Claude Agent SDK to default image (open, changes
-  requested)
+- **PR #3241**: Adds Node.js, pnpm + Claude Agent SDK to default image
+  (open, changes requested)
 
-Until merged, install Bun manually in sandbox.
+Until merged, use project snapshots for consistent tooling.

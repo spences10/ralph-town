@@ -41,6 +41,7 @@ ssh <token>@ssh.app.daytona.io "
 ```
 
 **Why this works:**
+
 - Double quotes on outside allow `$GH_TOKEN` to expand locally
 - Single quotes inside protect the URL from shell interpretation
 - Credential helper stores creds securely on disk
@@ -48,6 +49,7 @@ ssh <token>@ssh.app.daytona.io "
 ### 5. Spawn Teammate
 
 Provide teammate with:
+
 - Sandbox ID
 - SSH token (from step 3)
 - Repository to clone

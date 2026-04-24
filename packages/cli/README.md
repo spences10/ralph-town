@@ -30,14 +30,14 @@ npx ralph-town
 | Variable          | Required        | Description     |
 | ----------------- | --------------- | --------------- |
 | `DAYTONA_API_KEY` | runtime=daytona | Daytona API key |
-| `GH_TOKEN`      | git workflow    | GitHub token    |
+| `GH_TOKEN`        | git workflow    | GitHub token    |
 
 ## Development
 
 ```bash
-bun dev          # Development mode
-bun run build    # Compile TypeScript
-bun start        # Build + run compiled
+pnpm dev          # Development mode
+pnpm run build    # Compile TypeScript
+pnpm start        # Build + run compiled
 ```
 
 ## Research

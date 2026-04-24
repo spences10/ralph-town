@@ -1,8 +1,8 @@
 /**
- * Create the ralph-town-dev snapshot with Bun + Claude Agent SDK pre-installed
+ * Create the ralph-town-dev snapshot with Node.js, pnpm, and Claude Agent SDK pre-installed
  *
  * Run once to create the snapshot, then use it for fast sandbox creation.
- * Usage: bun src/create-snapshot.ts [--force]
+ * Usage: ralph-town sandbox snapshot create --force
  */
 
 import { Daytona, Image } from '@daytonaio/sdk';
@@ -29,7 +29,9 @@ async function create_snapshot(): Promise<void> {
 			await new Promise((resolve) => setTimeout(resolve, 5000));
 			console.log('Deleted existing snapshot.\n');
 		} else {
-			console.log(`Snapshot already exists (state: ${existing.state})`);
+			console.log(
+				`Snapshot already exists (state: ${existing.state})`,
+			);
 			console.log('Use --force to delete and recreate.');
 			return;
 		}
@@ -37,8 +39,8 @@ async function create_snapshot(): Promise<void> {
 		// Snapshot doesn't exist, continue
 	}
 
-	// Build image with Bun + Claude Agent SDK + gh CLI
-	const image = Image.base('debian:bookworm-slim')
+	// Build image with Node.js, pnpm, Claude Agent SDK + gh CLI
+	const image = Image.base('node:22-bookworm-slim')
 		.runCommands(
 			// Install dependencies
 			'apt-get update && apt-get install -y curl unzip git ca-certificates',
@@ -47,24 +49,23 @@ async function create_snapshot(): Promise<void> {
 			'chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg',
 			'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null',
 			'apt-get update && apt-get install -y gh',
-			// Install Bun
-			'curl -fsSL https://bun.sh/install | bash',
+			// Enable pnpm via Corepack
+			'corepack enable && corepack prepare pnpm@latest --activate',
 			// Create working directory
 			'mkdir -p /home/daytona',
 			// Fix PATH for SSH sessions - multiple approaches for reliability:
 			// 1. /etc/environment - read by PAM for all sessions
-			'echo "PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin" > /etc/environment',
+			'echo "PATH=/usr/local/bin:/usr/bin:/bin" > /etc/environment',
 			// 2. /etc/profile.d/ - for login shells
-			'echo "export PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin:\\$PATH" > /etc/profile.d/path.sh',
+			'echo "export PATH=/usr/local/bin:/usr/bin:/bin:\\$PATH" > /etc/profile.d/path.sh',
 			// 3. .bashrc - for interactive shells
-			'echo "export PATH=/usr/local/bin:/usr/bin:/bin:/root/.bun/bin:\\$PATH" >> /root/.bashrc',
+			'echo "export PATH=/usr/local/bin:/usr/bin:/bin:\\$PATH" >> /root/.bashrc',
 		)
-		.env({ PATH: '/root/.bun/bin:$PATH' })
 		.workdir('/home/daytona')
 		.runCommands(
 			// Initialize project and install Agent SDK
-			'/root/.bun/bin/bun init -y',
-			'/root/.bun/bin/bun add @anthropic-ai/claude-agent-sdk',
+			'/usr/local/bin/pnpm init -y',
+			'/usr/local/bin/pnpm add @anthropic-ai/claude-agent-sdk',
 		);
 
 	console.log('Building snapshot (this takes ~2-3 minutes)...\n');
@@ -88,4 +89,4 @@ async function create_snapshot(): Promise<void> {
 	}
 }
 
-create_snapshot();
+void create_snapshot();

@@ -6,16 +6,16 @@
  * snapshot-based sandboxes (known issue #31)
  */
 
-import { defineCommand } from 'citty';
 import { Daytona } from '@daytonaio/sdk';
-import { spawn } from 'child_process';
+import { defineCommand } from 'citty';
 import 'dotenv/config';
+import { spawn } from 'node:child_process';
 
 // Tools to check with their expected paths
 const REQUIRED_TOOLS: Array<{ name: string; path: string }> = [
 	{ name: 'gh', path: '/usr/bin/gh' },
 	{ name: 'git', path: '/usr/bin/git' },
-	{ name: 'bun', path: '/root/.bun/bin/bun' },
+	{ name: 'pnpm', path: '/usr/local/bin/pnpm' },
 	{ name: 'curl', path: '/usr/bin/curl' },
 ];
 const DEFAULT_SNAPSHOT = 'ralph-town-dev';
@@ -52,7 +52,7 @@ async function ssh_exec(
 export default defineCommand({
 	meta: {
 		name: 'preflight',
-		description: 'Verify snapshot has required tools (gh, git, bun)',
+		description: 'Verify snapshot has required tools (gh, git, pnpm)',
 	},
 	args: {
 		snapshot: {
@@ -149,9 +149,7 @@ export default defineCommand({
 				} else {
 					console.log('\x1b[31m✗ Preflight failed!\x1b[0m');
 					console.log('  Rebuild snapshot with:');
-					console.log(
-						'  bun run packages/cli/src/core/create-snapshot.ts --force',
-					);
+					console.log('  ralph-town sandbox snapshot create --force');
 					process.exitCode = 1;
 					return;
 				}

@@ -3,14 +3,12 @@
  * Wraps a Daytona sandbox with convenient methods
  */
 
-import type { Sandbox as DaytonaSandbox } from '@daytonaio/sdk';
-import type { Daytona } from '@daytonaio/sdk';
-import { with_retry } from './errors.js';
 import type {
-	ExecuteResult,
-	ISandbox,
-	SshAccess,
-} from './types.js';
+	Daytona,
+	Sandbox as DaytonaSandbox,
+} from '@daytonaio/sdk';
+import { with_retry } from './errors.js';
+import type { ExecuteResult, ISandbox, SshAccess } from './types.js';
 
 /** Default SSH access expiration in minutes */
 const DEFAULT_SSH_EXPIRES_MINUTES = 60;

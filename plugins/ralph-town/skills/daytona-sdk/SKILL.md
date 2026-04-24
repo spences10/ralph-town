@@ -1,7 +1,7 @@
 ---
 name: daytona-sdk
 # prettier-ignore
-description: Use when working with Daytona SDK - uploadFile(Buffer, path), Bun install, CodeLanguage options
+description: Use when working with Daytona SDK - uploadFile(Buffer, path), pnpm setup, CodeLanguage options
 ---
 
 # Daytona SDK

@@ -77,9 +77,9 @@ ralph-town sandbox delete abc123
 
 ## Performance
 
-| Operation | Time |
-|-----------|------|
-| First sandbox (builds image) | ~18s |
+| Operation                     | Time  |
+| ----------------------------- | ----- |
+| First sandbox (builds image)  | ~18s  |
 | Subsequent sandboxes (cached) | ~1.3s |
 
 14x speedup after first run.
@@ -91,16 +91,16 @@ ralph-town sandbox delete abc123
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `packages/cli` | Main CLI tool |
+| Package                   | Description                |
+| ------------------------- | -------------------------- |
+| `packages/cli`            | Main CLI tool              |
 | `packages/mcp-ralph-town` | MCP server for Claude Code |
 
 ## Development
 
 ```bash
-bun dev          # Development mode
-bun run build    # Compile TypeScript
+pnpm dev          # Development mode
+pnpm run build    # Compile TypeScript
 ```
 
 ## Research

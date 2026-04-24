@@ -1,16 +1,22 @@
 {
 	"compilerOptions": {
+		"noEmit": true,
 		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"lib": ["ES2022"],
-		"strict": true,
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"allowImportingTsExtensions": true,
 		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
+		"allowSyntheticDefaultImports": true,
 		"resolveJsonModule": true,
-		"declaration": true,
-		"declarationMap": true
+		"strict": true,
+		"skipLibCheck": true,
+		"types": ["node", "vitest/globals"]
 	},
+	"include": [
+		"vite.config.ts",
+		"scripts/**/*.ts",
+		"packages/*/vite.config.ts",
+		"packages/*/src/**/*"
+	],
 	"exclude": ["node_modules", "dist", "packages/*/dist"]
 }

@@ -12,7 +12,7 @@ description: Ralph-town development guidelines. Use for code style, project stru
 - **PascalCase** - classes
 - **SCREAMING_SNAKE_CASE** - constants
 - Prettier: tabs, single quotes, trailing commas, 70 char width
-- Use Bun, not npm/pnpm
+- Use pnpm
 
 ## Project Structure
 
@@ -34,8 +34,8 @@ packages/
 ## Commands
 
 ```bash
-bun dev          # Development mode
-bun run build    # Compile TypeScript
+pnpm dev          # Development mode
+pnpm run build    # Compile TypeScript
 ```
 
 ## Don't
@@ -45,6 +45,6 @@ bun run build    # Compile TypeScript
 
 ## Notes
 
-- This is a monorepo with Bun workspaces
+- This is a monorepo with pnpm workspaces
 - CLI and MCP server share sandbox module code
 - Check `docs/RESEARCH.md` for Daytona SDK findings

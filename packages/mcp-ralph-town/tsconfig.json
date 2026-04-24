@@ -1,16 +1,16 @@
 {
 	"compilerOptions": {
 		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"declaration": true,
-		"outDir": "dist",
-		"rootDir": "src",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
 		"strict": true,
+		"rootDir": "./src",
+		"outDir": "./dist",
 		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
 		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
-		"resolveJsonModule": true
+		"types": ["node", "vitest/globals"]
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist"]

@@ -3,8 +3,8 @@
  * Tools for managing Daytona sandboxes via the CLI
  */
 
-import { spawn } from 'child_process';
-import { isAbsolute } from 'path';
+import { spawn } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 import { defineTool } from 'tmcp/tool';
 import { tool } from 'tmcp/utils';
 import * as v from 'valibot';
@@ -28,7 +28,6 @@ const cli_path = get_cli_path();
 // Per-tool timeout constants
 const QUICK_TIMEOUT_MS = 30000; // 30 seconds for quick ops (list, ssh, delete)
 const DEFAULT_TIMEOUT_MS = 120000; // 2 minutes for standard ops (create, exec)
-const LONG_TIMEOUT_MS = 300000; // 5 minutes for snapshot operations
 
 /**
  * Execute CLI command and return result
@@ -136,7 +135,9 @@ export const sandbox_create_tool = defineTool(
 				const sandbox = JSON.parse(result.stdout);
 				return tool.text(JSON.stringify(sandbox, null, 2));
 			} catch {
-				return tool.text(result.stdout || 'Sandbox created successfully');
+				return tool.text(
+					result.stdout || 'Sandbox created successfully',
+				);
 			}
 		} else {
 			return tool.error(
@@ -246,7 +247,9 @@ export const sandbox_delete_tool = defineTool(
 				const delete_result = JSON.parse(result.stdout);
 				return tool.text(JSON.stringify(delete_result, null, 2));
 			} catch {
-				return tool.text(result.stdout || `Sandbox ${id} deleted successfully`);
+				return tool.text(
+					result.stdout || `Sandbox ${id} deleted successfully`,
+				);
 			}
 		} else {
 			return tool.error(
@@ -301,7 +304,6 @@ const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
 	/^tr$/,
 	/^xargs$/,
 	// Package managers and build tools
-	/^bun$/,
 	/^npm$/,
 	/^npx$/,
 	/^pnpm$/,
@@ -410,7 +412,7 @@ export const sandbox_exec_tool = defineTool(
 	{
 		name: 'sandbox_exec',
 		description:
-			'Execute a command in a Daytona sandbox. SECURITY: Commands are validated against an allowlist of safe patterns (git, ls, cat, npm, bun, etc.). Dangerous commands will be rejected. All commands are logged for audit purposes. Required: id (sandbox ID or name), cmd (command to execute). Options: cwd (working directory), timeout (command timeout in seconds, default 120)',
+			'Execute a command in a Daytona sandbox. SECURITY: Commands are validated against an allowlist of safe patterns (git, ls, cat, pnpm, npm, etc.). Dangerous commands will be rejected. All commands are logged for audit purposes. Required: id (sandbox ID or name), cmd (command to execute). Options: cwd (working directory), timeout (command timeout in seconds, default 120)',
 		schema: v.object({
 			id: v.pipe(v.string(), v.minLength(1)),
 			cmd: v.pipe(v.string(), v.minLength(1)),
@@ -435,7 +437,7 @@ export const sandbox_exec_tool = defineTool(
 		if (!allowed) {
 			return tool.error(
 				`Command not allowed: "${cmd.split(/\s+/)[0]}". ` +
-					'Only allowlisted commands (git, ls, cat, npm, bun, node, etc.) are permitted. ' +
+					'Only allowlisted commands (git, ls, cat, pnpm, npm, node, etc.) are permitted. ' +
 					'See documentation for the full allowlist.',
 			);
 		}

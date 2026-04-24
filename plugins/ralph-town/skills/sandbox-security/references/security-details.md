@@ -7,11 +7,12 @@ like `git` or `gh` won't resolve. This is a known issue
 (daytonaio/daytona#2283).
 
 **Common tool paths:**
+
 ```
 /usr/bin/git
 /usr/bin/gh
 /usr/bin/curl
-/root/.bun/bin/bun
+/usr/local/bin/pnpm
 /bin/ls
 /bin/cat
 /bin/echo
@@ -21,6 +22,7 @@ like `git` or `gh` won't resolve. This is a known issue
 ## Why Tokens in URLs Are Dangerous
 
 When you embed a token in a git URL:
+
 ```bash
 git clone https://$GH_TOKEN@github.com/owner/repo.git
 ```
@@ -49,6 +51,7 @@ set in the sandbox's environment. This means:
 ### Threat Model
 
 If you run untrusted code in the sandbox:
+
 - It can read `$GH_TOKEN` via `env` command
 - It can read `/proc/1/environ` to get all env vars
 - It can exfiltrate tokens to external servers

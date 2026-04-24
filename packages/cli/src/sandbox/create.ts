@@ -3,8 +3,8 @@
  * Factory function for creating Daytona sandboxes
  */
 
-import { Image } from '@daytonaio/sdk';
 import type { Sandbox as DaytonaSandbox } from '@daytonaio/sdk';
+import { Image } from '@daytonaio/sdk';
 import { create_daytona_client } from './client.js';
 import { with_retry } from './errors.js';
 import { Sandbox } from './sandbox.js';
@@ -33,7 +33,10 @@ export function create_default_image(
 	base: string = DEFAULT_BASE_IMAGE,
 	additional_commands: string[] = [],
 ): Image {
-	const commands = [...DEFAULT_DOCKERFILE_COMMANDS, ...additional_commands];
+	const commands = [
+		...DEFAULT_DOCKERFILE_COMMANDS,
+		...additional_commands,
+	];
 	return Image.base(base).dockerfileCommands(commands);
 }
 

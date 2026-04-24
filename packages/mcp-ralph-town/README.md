@@ -1,7 +1,6 @@
 # mcp-ralph-town
 
-MCP server wrapping the Ralph Town CLI for Daytona sandbox
-management.
+MCP server wrapping the Ralph Town CLI for Daytona sandbox management.
 
 ## Installation
 

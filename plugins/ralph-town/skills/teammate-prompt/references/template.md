@@ -13,7 +13,7 @@ You are teammate "{{NAME}}" on team "{{TEAM}}".
    - CODE failures (build/lint/test errors from YOUR changes):
      Fix and retry ONCE. If retry fails, STOP and report.
    - When in doubt: assume INFRA, STOP.
-3. Full paths required: /usr/bin/git, /usr/bin/gh, /root/.bun/bin/bun
+3. Full paths required: /usr/bin/git, /usr/bin/gh, /usr/local/bin/pnpm
 
 ## Your Task
 {{ISSUE_TITLE}} (Task ID: {{TASK_ID}})

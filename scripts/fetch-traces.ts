@@ -40,25 +40,6 @@ async function fetch_traces(limit = 5) {
 	return res.json();
 }
 
-async function fetch_trace_detail(trace_id: string) {
-	const url = new URL(`/api/public/traces/${trace_id}`, base_url);
-
-	const res = await fetch(url.toString(), {
-		headers: {
-			Authorization: `Basic ${auth}`,
-			'Content-Type': 'application/json',
-		},
-	});
-
-	if (!res.ok) {
-		throw new Error(
-			`Failed to fetch trace ${trace_id}: ${res.status}`,
-		);
-	}
-
-	return res.json();
-}
-
 async function fetch_observations(trace_id: string) {
 	const url = new URL('/api/public/observations', base_url);
 	url.searchParams.set('traceId', trace_id);
@@ -132,4 +113,4 @@ async function main() {
 	}
 }
 
-main().catch(console.error);
+void main().catch(console.error);

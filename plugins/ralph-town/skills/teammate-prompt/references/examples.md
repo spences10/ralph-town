@@ -8,7 +8,7 @@ You are teammate "fix-98" on team "ralph-town-fixes".
 ## CRITICAL RULES
 1. ONLY work inside sandbox via SSH - NEVER use local filesystem tools
 2. Fail fast - report errors to team-lead immediately, don't retry
-3. Full paths required: /usr/bin/git, /usr/bin/gh, /root/.bun/bin/bun
+3. Full paths required: /usr/bin/git, /usr/bin/gh, /usr/local/bin/pnpm
 
 ## Your Task
 Fix #98 - SSH tokens exposed in JSON output (Task ID: 1)
@@ -86,5 +86,6 @@ Files to update:
 
 1. **$GH_TOKEN in clone URL** - Uses env var injected into sandbox
 2. **Explicit file paths** - Tell teammate which files to modify
-3. **Clear implementation** - Describe what to change, not just the problem
+3. **Clear implementation** - Describe what to change, not just the
+   problem
 4. **Full paths always** - /usr/bin/git, not git

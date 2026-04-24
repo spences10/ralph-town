@@ -8,8 +8,8 @@ description: Ralph-town snapshot commands. Use for preflight checks and snapshot
 
 ## Quick Reference
 
-**Verify snapshot ready:** `ralph-town sandbox preflight`
-**Create snapshot:** `ralph-town sandbox snapshot create`
+**Verify snapshot ready:** `ralph-town sandbox preflight` **Create
+snapshot:** `ralph-town sandbox snapshot create`
 
 ## sandbox preflight
 
@@ -27,13 +27,15 @@ ralph-town sandbox preflight --json
 ```
 
 **Flags:**
+
 - `--snapshot <name>` - Snapshot to test (default: ralph-town-dev)
 - `--json` - Output as JSON
 
 **What it checks:**
+
 - `/usr/bin/gh` - GitHub CLI
 - `/usr/bin/git` - Git
-- `/root/.bun/bin/bun` - Bun runtime
+- `/usr/local/bin/pnpm` - pnpm package manager
 - `/usr/bin/curl` - curl
 
 ## sandbox snapshot create
@@ -55,13 +57,15 @@ ralph-town sandbox snapshot create --json
 ```
 
 **Flags:**
+
 - `--name <name>` - Snapshot name (default: ralph-town-dev)
 - `--force` - Delete existing snapshot and recreate
 - `--json` - Output as JSON
 
 **What snapshot includes:**
+
 - Base image: `debian:bookworm-slim`
-- Tools: git, curl, gh CLI, bun
+- Tools: git, curl, gh CLI, pnpm
 - SDK: @anthropic-ai/claude-agent-sdk
 - Working dir: /home/daytona
 
@@ -82,16 +86,16 @@ const daytona = new Daytona();
 
 // Create snapshot
 const image = Image.base('debian:bookworm-slim')
-  .runCommands(
-    'apt-get update && apt-get install -y curl git',
-    'curl -fsSL https://bun.sh/install | bash',
-  )
-  .env({ PATH: '/root/.bun/bin:$PATH' })
-  .workdir('/home/daytona');
+	.runCommands(
+		'apt-get update && apt-get install -y curl git',
+		'corepack enable && corepack prepare pnpm@latest --activate',
+	)
+	.env({ PATH: '$PATH' })
+	.workdir('/home/daytona');
 
 await daytona.snapshot.create(
-  { name: 'my-snapshot', image },
-  { onLogs: console.log, timeout: 300 },
+	{ name: 'my-snapshot', image },
+	{ onLogs: console.log, timeout: 300 },
 );
 
 // List/check snapshots
@@ -101,5 +105,6 @@ const snapshot = await daytona.snapshot.get('ralph-town-dev');
 
 ## Known Limitation
 
-`executeCommand()` returns exit code `-1` on snapshot sandboxes.
-Use SSH instead. See [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
+`executeCommand()` returns exit code `-1` on snapshot sandboxes. Use
+SSH instead. See
+[daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
