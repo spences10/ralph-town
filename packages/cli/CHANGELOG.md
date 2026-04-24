@@ -1,5 +1,16 @@
 # ralph-town
 
+## 0.0.7
+
+### Patch Changes
+
+- a8a4316: Clarify sandbox-scoped credential names and normalize
+  forwarded environment variables for safer eval workflows.
+- 3de6927: Add disposable sandbox run command and model-neutral MCP
+  tooling for LLM eval execution workflows.
+- 6d6cddc: Migrate project to Vite Plus, pnpm, Vitest testing, node
+  imports, and updated development tooling.
+
 ## 0.0.6
 
 ### Patch Changes
