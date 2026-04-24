@@ -1,22 +1,25 @@
 # Daytona Sandbox Research
 
 Research notes and findings from exploring Daytona SDK integration for
-Claude Code teams.
+Ralph-Town's disposable sandbox execution model.
 
 ---
 
 ## Problem Statement
 
-When Claude Code spawns teammates (via the Task tool), all agents
-share the same filesystem. This creates problems:
+LLM evals, CLI smoke tests, and model-generated tooling commands need
+a real environment without touching the user's local filesystem. Local
+runs create risk:
 
-- **Collisions** - Two agents editing the same file conflict
-- **No isolation** - One agent's changes affect others
-- **Risk** - Experimental code runs on user's actual codebase
-- **No parallel branches** - Cannot work on multiple features
-  simultaneously
+- **No isolation** - commands can mutate the working tree or machine
+- **Credential exposure** - local tokens may leak to logs or
+  subprocesses
+- **Poor reproducibility** - local state affects results
+- **Cleanup burden** - failed experiments leave files and processes
+  behind
 
-**Solution**: Give each teammate their own Daytona sandbox.
+**Solution**: run commands in disposable Daytona sandboxes, capture
+structured results, and delete sandboxes by default.
 
 ---
 
@@ -32,8 +35,8 @@ Tested with pre-baked Node.js image:
 | Second  | **~1.3s** | Uses cached image   |
 | Third   | **~1.3s** | Cached              |
 
-**Conclusion**: 14x speedup after first run. Cached sandboxes are fast
-enough for practical use.
+**Conclusion**: cached sandboxes are fast enough for practical eval
+and smoke-test workflows.
 
 ### 2. SSH Access Works
 
@@ -45,14 +48,16 @@ const ssh_access = await sandbox.createSshAccess(60); // 60 min expiry
 // Connect with: ssh <token>@ssh.app.daytona.io
 ```
 
-**Tested and verified** - Full shell access, can run any command.
+**Tested and verified** - full shell access, can run arbitrary
+commands.
 
 ### 3. Pre-baked Images
 
 Default image includes:
 
-- `node:22-slim` base
+- `node:22-bookworm-slim` base
 - `git`, `curl` installed
+- `pnpm` via Corepack
 - `typescript`, `tsx` globally installed
 
 Custom images can add more tools via dockerfile commands.
@@ -77,71 +82,70 @@ sandboxes. This is a known upstream issue.
 | Default  | ~500ms   | Works          |
 | Snapshot | ~1.8s    | Broken (-1)    |
 
-**Recommended approach**: Use default sandbox + runtime tool install
-instead of snapshots when executeCommand is needed. SSH works on both.
+**Recommended approach**: use SSH-backed execution for snapshot
+sandboxes. This is why `ralph-town run` executes commands over SSH.
 
 ---
 
 ## Architecture
 
-### Claude Code Team + Daytona Sandboxes
+### Disposable Sandbox Command Execution
 
 ```
-Claude Code Team Lead (local)
-├── Creates sandbox (1.3s with cached image)
+Local orchestrator
+├── Creates Daytona sandbox
 ├── Gets SSH credentials
-│
-├── Teammate A ──SSH──> Sandbox A ──> feature-branch-a
-├── Teammate B ──SSH──> Sandbox B ──> feature-branch-b
-└── Teammate C ──SSH──> Sandbox C ──> feature-branch-c
-
-Each teammate works in complete isolation.
-Push branches, create PRs when done.
-Delete sandboxes to clean up.
+├── Optionally clones repository
+├── Runs command via SSH
+├── Captures stdout/stderr/exit code/duration
+└── Deletes sandbox unless --keep is set
 ```
 
 ### Why This Architecture?
 
-1. **Isolation** - Each sandbox is independent
-2. **Parallel work** - Multiple features simultaneously
-3. **Safety** - Experiments do not touch real code
-4. **Disposable** - Failed attempts just get deleted
-5. **Full environment** - Not just command execution, real shell
+1. **Isolation** - each run is independent
+2. **Safety** - experiments do not touch the local machine
+3. **Reproducibility** - cleaner baseline than local developer state
+4. **Disposable** - failed attempts are deleted
+5. **Model-neutral** - CLI and MCP surfaces work for any LLM/tool
+   runner
 
 ---
 
 ## CLI Commands
 
+### run
+
+Create a disposable sandbox, run a command, capture output, and delete
+it by default.
+
+```bash
+ralph-town run -- pnpx my-pi@latest --help
+ralph-town run --json -- pnpx my-pi@latest --help
+ralph-town run --repo https://github.com/owner/repo -- pnpm test
+ralph-town run --keep -- pnpx my-pi@latest --help
+```
+
 ### sandbox create
 
-Create a new Daytona sandbox.
+Create a reusable Daytona sandbox.
 
 ```bash
 ralph-town sandbox create [options]
 ```
 
-**Flags:** | Flag | Description | Default |
-|------|-------------|---------| | `--snapshot <name>` | Use pre-built
-snapshot | - | | `--image <image>` | Base Docker image |
-`node:22-slim` | | `--name <name>` | Sandbox name | auto-generated | |
-`--auto-stop <minutes>` | Auto-stop interval in minutes | 15 | |
-`--timeout <seconds>` | Creation timeout in seconds | 120 | |
-`--env-file <path>` | Path to .env file | - | | `--env <KEY=VALUE>` |
-Environment variable (repeatable) | - | | `--json` | Output as JSON |
-false |
+**Common flags:**
 
-**Examples:**
-
-```bash
-# Basic sandbox
-ralph-town sandbox create
-
-# With snapshot and env vars
-ralph-town sandbox create --snapshot ralph-town-dev --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
-
-# Custom image with timeout
-ralph-town sandbox create --image ubuntu:22.04 --timeout 180
-```
+| Flag                    | Description                   | Default                 |
+| ----------------------- | ----------------------------- | ----------------------- |
+| `--snapshot <name>`     | Use pre-built snapshot        | -                       |
+| `--image <image>`       | Base Docker image             | `node:22-bookworm-slim` |
+| `--name <name>`         | Sandbox name                  | auto-generated          |
+| `--auto-stop <minutes>` | Auto-stop interval in minutes | 15                      |
+| `--timeout <seconds>`   | Creation timeout in seconds   | 120                     |
+| `--env-file <path>`     | Path to .env file             | -                       |
+| `--env <KEY=VALUE>`     | Environment variables         | -                       |
+| `--json`                | Output as JSON                | false                   |
 
 ### sandbox ssh
 
@@ -161,7 +165,8 @@ ralph-town sandbox list [--json]
 
 ### sandbox exec
 
-Execute command in sandbox.
+Execute command in an existing sandbox. Prefer `ralph-town run` for
+new disposable workloads.
 
 ```bash
 ralph-town sandbox exec <id> <command>
@@ -175,25 +180,20 @@ Delete a sandbox.
 ralph-town sandbox delete <id>
 ```
 
-### Preflight Command
+---
 
-Verify snapshot has required tools before spawning teammates.
+## Snapshot Commands
+
+### Preflight
+
+Verify a snapshot has required tools before relying on it in evals or
+kept sessions.
 
 ```bash
-# Check default snapshot (ralph-town-dev)
 ralph-town sandbox preflight
-
-# Check specific snapshot
 ralph-town sandbox preflight --snapshot my-snapshot
-
-# JSON output for scripts
 ralph-town sandbox preflight --json
 ```
-
-**Flags:**
-
-- `--snapshot <name>` - Snapshot to test (default: ralph-town-dev)
-- `--json` - Output as JSON
 
 **Tools checked:**
 
@@ -202,185 +202,107 @@ ralph-town sandbox preflight --json
 - `/usr/local/bin/pnpm` - pnpm package manager
 - `/usr/bin/curl` - curl
 
-**How it works:**
-
-1. Creates a temporary sandbox from the snapshot
-2. Gets SSH credentials
-3. Checks each tool exists via SSH (`/bin/test -x <path>`)
-4. Deletes the temporary sandbox
-5. Reports pass/fail
-
-**Use case:** Run before spawning teammates to catch snapshot issues
-early. If preflight fails, rebuild snapshot with
-`sandbox snapshot create --force`.
-
-### Snapshot Commands
-
-Create pre-baked snapshots with all required tools.
+### Create Snapshot
 
 ```bash
-# Create default snapshot (ralph-town-dev)
 ralph-town sandbox snapshot create
-
-# Create with custom name
 ralph-town sandbox snapshot create --name my-snapshot
-
-# Force recreate existing snapshot
 ralph-town sandbox snapshot create --force
-
-# JSON output
 ralph-town sandbox snapshot create --json
 ```
 
-**Flags:**
+**Snapshot includes:**
 
-- `--name <name>` - Snapshot name (default: ralph-town-dev)
-- `--force` - Delete existing snapshot and recreate
-- `--json` - Output as JSON
-
-**What the snapshot includes:**
-
-- Base image: `debian:bookworm-slim`
+- Base image: `node:22-bookworm-slim`
 - System packages: git, curl, ca-certificates
-- GitHub CLI: gh (for PR creation)
+- GitHub CLI: gh
 - pnpm package manager: /usr/local/bin/pnpm
 - Pre-installed: @anthropic-ai/claude-agent-sdk
 - Working directory: /home/daytona
 - PATH fixes: /etc/environment, /etc/profile.d/, ~/.bashrc
 
-**Build time:** ~2-3 minutes
-
-**When to rebuild:**
-
-- After changing tool requirements
-- If preflight fails
-- To update SDK version
-
 ---
 
-## Credential Workflow for Teammates
+## Credential Workflow
 
-Teammates in sandboxes need credentials to push code and create PRs.
-Here is how to set it up.
+Local orchestration credentials and sandbox credentials are
+intentionally separate.
+
+| Variable                    | Where used | Purpose                                         |
+| --------------------------- | ---------- | ----------------------------------------------- |
+| `DAYTONA_API_KEY`           | local      | Create/manage Daytona sandboxes                 |
+| `GH_TOKEN`                  | local      | Local GitHub CLI or automation                  |
+| `ANTHROPIC_API_KEY`         | local      | Local Anthropic/API calls                       |
+| `SANDBOX_GH_TOKEN`          | sandbox    | Forwarded as `GH_TOKEN` inside sandbox          |
+| `SANDBOX_ANTHROPIC_API_KEY` | sandbox    | Forwarded as `ANTHROPIC_API_KEY` inside sandbox |
+
+`GITHUB_PAT` is a deprecated compatibility alias for
+`SANDBOX_GH_TOKEN`.
 
 ### Passing Credentials at Sandbox Creation
 
-Use `--env` to inject environment variables:
-
 ```bash
-# Pass sandbox-scoped GitHub token for git push/PR workflow
 ralph-town sandbox create \
   --snapshot ralph-town-dev \
-  --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
+  --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN" \
+  --env "SANDBOX_ANTHROPIC_API_KEY=$SANDBOX_ANTHROPIC_API_KEY"
 ```
 
-The token is then available inside the sandbox as `$GH_TOKEN`.
+Inside the sandbox these are available as `$GH_TOKEN` and
+`$ANTHROPIC_API_KEY`.
 
-### Teammate Git Workflow (Secure)
+### Secure Git Workflow
 
-Inside the sandbox, teammates use the credential helper to avoid
-leaking tokens in URLs, logs, or process lists:
+Avoid embedding tokens in git URLs. Use credential helper only when
+push or private repository access is needed:
 
 ```bash
-# Setup credential helper (one-time)
-git config --global credential.helper store
-echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
-
-# Clone WITHOUT token in URL (credentials auto-applied)
-git clone https://github.com/user/repo.git
-
-# Push works without prompts
-git push -u origin feature-branch
+/usr/bin/git config --global credential.helper store
+/bin/printf 'https://oauth2:%s@github.com\n' "$GH_TOKEN" > ~/.git-credentials
+/bin/chmod 600 ~/.git-credentials
 ```
 
-**Why not embed token in URL?** Tokens in URLs like
-`git clone https://$TOKEN@github.com/...` leak via:
+Security considerations:
 
-- Process list (`ps aux` shows full command line)
-- Shell history
-- Error messages and logs
-- Debug output
-
-The credential helper keeps the token in a protected file instead.
-
-### Creating PRs from Sandbox
-
-The snapshot includes `gh` CLI. Authenticate and create PRs:
-
-```bash
-# Auth with token
-echo $GH_TOKEN | gh auth login --with-token
-
-# Create PR
-gh pr create --title "Feature X" --body "Description"
-```
-
-### Security Considerations
-
-1. **Never bake tokens into snapshots** - Pass at runtime via `--env`
-2. **Use credential helper** - Never embed tokens in git URLs
-3. **Tokens visible in sandbox** - Only pass what teammates need
-4. **Use scoped tokens** - Minimum permissions (repo access only)
-5. **Sandboxes are ephemeral** - Tokens gone when sandbox deleted
-
-### Known Issues & Workarounds
-
-| Issue                                           | Workaround                      |
-| ----------------------------------------------- | ------------------------------- |
-| `sandbox exec` returns -1 on snapshot sandboxes | Use SSH instead                 |
-| SSH PATH broken (commands not found)            | Use full paths: `/usr/bin/git`  |
-| Preflight fails                                 | Rebuild snapshot with `--force` |
-
-### Future Improvements
-
-- **#39**: `sandbox env set <id> KEY=VALUE` for running sandboxes
+1. **Never bake tokens into snapshots** - pass at runtime via `--env`
+2. **Use credential helper** - never embed tokens in git URLs
+3. **Env vars are visible in sandbox** - pass only what the run needs
+4. **Use scoped tokens** - minimum permissions
+5. **Sandboxes are ephemeral** - credentials disappear when deleted
 
 ---
 
 ## Workflow Example
 
 ```bash
-# 1. Verify snapshot is ready
-ralph-town sandbox preflight
-# => Preflight passed!
+# One-shot CLI eval
+ralph-town run --json -- pnpx my-pi@latest --help
 
-# 2. Team lead creates sandbox for teammate
-ralph-town sandbox create --snapshot ralph-town-dev --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
-# => Sandbox ID: abc123
+# Repository smoke test
+ralph-town run \
+  --repo https://github.com/user/repo \
+  -- pnpm test
 
-# 3. Get SSH access
-ralph-town sandbox ssh abc123
-# => ssh xyz789@ssh.app.daytona.io
-
-# 4. Teammate SSHs in and works
-ssh xyz789@ssh.app.daytona.io
-> # Setup credentials (secure)
-> git config --global credential.helper store
-> echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
-> git clone https://github.com/user/repo.git
-> cd repo
-> git checkout -b feature/new-thing
-> # ... make changes ...
-> git commit -m "Add new feature"
-> git push -u origin feature/new-thing
-> gh pr create --title "Add feature" --body "Details"
-
-# 5. Cleanup when done
-ralph-town sandbox delete abc123
+# Kept debug session
+ralph-town sandbox create --snapshot ralph-town-dev --json
+ralph-town sandbox ssh <id> --show-secrets
+ssh <token>@ssh.app.daytona.io
+ralph-town sandbox delete <id>
 ```
 
 ---
 
 ## MCP Tools
 
-The MCP server exposes these tools for Claude Code:
+The MCP server exposes tools for model-neutral sandbox orchestration:
 
+- `sandbox_run` - Create sandbox, run command, delete by default
 - `sandbox_create` - Create sandbox, returns ID
 - `sandbox_ssh` - Get SSH credentials
 - `sandbox_list` - List active sandboxes
-- `sandbox_exec` - Run command in sandbox
+- `sandbox_exec` - Run command in existing sandbox
 - `sandbox_delete` - Delete sandbox
-- `sandbox_preflight` - Verify snapshot has required tools
+- `sandbox_env_list` / `sandbox_env_set` - Manage sandbox env vars
 
 ---
 
@@ -417,7 +339,5 @@ Daytona issues affecting this project:
 ### Internal
 
 - `packages/cli/src/sandbox/` - Sandbox module
-- `packages/cli/src/commands/sandbox/` - CLI commands
-- `packages/cli/src/commands/sandbox/preflight.ts` - Preflight command
-- `packages/cli/src/commands/sandbox/snapshot/` - Snapshot commands
-- `packages/mcp-ralph-town/src/tools/sandbox.ts` - MCP tools
+- `packages/cli/src/commands/run.ts` - Disposable run command
+- `packages/cli/src/commands/sandbox/` - Sandbox management commands

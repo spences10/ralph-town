@@ -75,8 +75,8 @@ command success/failure.
 
 1. Use SSH instead of executeCommand for reliable exit codes
 2. Check command output/stderr for success indicators
-3. For teammate workflows, prefer default sandboxes (no snapshot)
-   where executeCommand works reliably
+3. For SDK `executeCommand` workflows, prefer default sandboxes (no
+   snapshot) where executeCommand works reliably
 
 ```typescript
 // Unreliable on snapshot sandboxes - exit code always -1

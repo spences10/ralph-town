@@ -1,7 +1,7 @@
 ---
 name: snapshot-management
 # prettier-ignore
-description: Ralph-town snapshot commands. Use for preflight checks and snapshot creation before spawning teammates.
+description: Ralph-town snapshot commands. Use for preflight checks and snapshot creation before reliable sandbox runs.
 ---
 
 # Snapshot Management
@@ -13,7 +13,8 @@ snapshot:** `ralph-town sandbox snapshot create`
 
 ## sandbox preflight
 
-Verify snapshot has required tools before spawning teammates.
+Verify a snapshot has the tools needed for evals and sandbox command
+runs.
 
 ```bash
 # Check default snapshot (ralph-town-dev)
@@ -64,7 +65,7 @@ ralph-town sandbox snapshot create --json
 
 **What snapshot includes:**
 
-- Base image: `debian:bookworm-slim`
+- Base image: `node:22-bookworm-slim`
 - Tools: git, curl, gh CLI, pnpm
 - SDK: @anthropic-ai/claude-agent-sdk
 - Working dir: /home/daytona
@@ -73,9 +74,10 @@ ralph-town sandbox snapshot create --json
 
 ## When to Use
 
-- Run `preflight` before spawning teammates
-- Run `snapshot create` if preflight fails
-- Use `--force` to rebuild after tool updates
+- Run `preflight` before relying on a snapshot in evals or kept
+  sessions.
+- Run `snapshot create` if preflight fails.
+- Use `--force` to rebuild after tool updates.
 
 ## SDK Usage
 
@@ -84,27 +86,21 @@ import { Daytona, Image } from '@daytonaio/sdk';
 
 const daytona = new Daytona();
 
-// Create snapshot
-const image = Image.base('debian:bookworm-slim')
+const image = Image.base('node:22-bookworm-slim')
 	.runCommands(
 		'apt-get update && apt-get install -y curl git',
 		'corepack enable && corepack prepare pnpm@latest --activate',
 	)
-	.env({ PATH: '$PATH' })
 	.workdir('/home/daytona');
 
 await daytona.snapshot.create(
 	{ name: 'my-snapshot', image },
 	{ onLogs: console.log, timeout: 300 },
 );
-
-// List/check snapshots
-const snapshots = await daytona.snapshot.list();
-const snapshot = await daytona.snapshot.get('ralph-town-dev');
 ```
 
 ## Known Limitation
 
 `executeCommand()` returns exit code `-1` on snapshot sandboxes. Use
-SSH instead. See
+SSH-backed `ralph-town run` or manual SSH instead. See
 [daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)

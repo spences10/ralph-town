@@ -1,73 +1,67 @@
 ---
 name: sandbox-workflow
 # prettier-ignore
-description: Use for teammate sandbox operations - SSH access, git workflow, full paths required
+description: Use for reusable Daytona sandbox workflows, SSH access, git setup, and isolated command execution.
 ---
 
 # Sandbox Workflow
 
-## Team-Lead Quick Start
+Prefer the top-level disposable run command for evals and smoke tests:
 
 ```bash
-source .env  # Load SANDBOX_GH_TOKEN
-
-# 1. Create sandbox
-ralph-town sandbox create --snapshot ralph-town-dev
-
-# 2. Get SSH token
-ralph-town sandbox ssh <sandbox-id> --show-secrets
-
-# 3. Configure credentials via SSH (BEFORE spawning teammate)
-ssh <token>@ssh.app.daytona.io "
-  /usr/bin/git config --global credential.helper store &&
-  /bin/echo 'https://oauth2:$GH_TOKEN@github.com' > ~/.git-credentials &&
-  /bin/chmod 600 ~/.git-credentials
-"
-
-# 4. Spawn teammate with SSH token
-# 5. Cleanup: ralph-town sandbox delete <sandbox-id>
+ralph-town run --json -- pnpx my-pi@latest --help
+ralph-town run --repo https://github.com/owner/repo -- pnpm test
 ```
 
-## Teammate Quick Start
+Use the manual workflow only when you need a kept sandbox.
+
+## Kept Sandbox Quick Start
 
 ```bash
+# 1. Verify snapshot tools
+ralph-town sandbox preflight
+
+# 2. Create sandbox
+ralph-town sandbox create --snapshot ralph-town-dev --json
+
+# 3. Get SSH access
+ralph-town sandbox ssh <sandbox-id> --show-secrets
+
+# 4. Connect and work
 ssh <token>@ssh.app.daytona.io
 cd /home/daytona
 
-# Credentials pre-configured by team-lead
-/usr/bin/git clone https://github.com/owner/repo.git
-cd repo
-/usr/bin/git config user.email "teammate@example.com"
-/usr/bin/git config user.name "teammate"
-/usr/bin/git checkout -b fix/my-branch
-# make changes...
-/usr/bin/git add -A
-/usr/bin/git commit -m "message"
-/usr/bin/git push -u origin fix/my-branch
-/usr/bin/gh pr create --title "title" --body "Fixes #N"
+# 5. Cleanup
+ralph-town sandbox delete <sandbox-id>
 ```
 
-## Critical Rules
+## GitHub Credentials
 
-**Full paths required** - SSH PATH is broken:
+If a kept sandbox needs GitHub push access, pass a sandbox-scoped
+token:
 
-- `/usr/bin/git`, `/usr/bin/gh`, `/usr/local/bin/pnpm`
-- `/bin/ls`, `/bin/cat`, `/bin/echo`
+```bash
+ralph-town sandbox create \
+	--snapshot ralph-town-dev \
+	--env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
+```
 
-**Work directory:** `/home/daytona` (not /workspaces)
+Inside the sandbox, Ralph-Town exposes that token as `GH_TOKEN`.
 
-**Quoting:** `$SANDBOX_GH_TOKEN` must expand locally:
+Do not paste raw token values into prompts, logs, git remotes, or
+command output.
 
-- GOOD: `ssh ... "...echo '...$GH_TOKEN@...'..."`
-- BAD: `ssh ... '...echo "...$GH_TOKEN@..."...'`
+## Full Paths
 
-## Fail Fast (Teammates)
+SSH sessions can have a limited PATH. Use full paths when a command is
+not found:
 
-If sandbox fails:
-
-1. Report error to team-lead immediately
-2. DO NOT attempt workarounds
-3. DO NOT keep retrying - wasting tokens
+| Tool | Full Path             |
+| ---- | --------------------- |
+| git  | `/usr/bin/git`        |
+| gh   | `/usr/bin/gh`         |
+| pnpm | `/usr/local/bin/pnpm` |
+| curl | `/usr/bin/curl`       |
 
 ## References
 

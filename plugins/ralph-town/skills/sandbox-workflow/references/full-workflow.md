@@ -1,47 +1,65 @@
 # Full Sandbox Workflow Reference
 
-## Complete Teammate Workflow
+## Prefer Disposable Runs
 
-### 1. SSH Into Sandbox
+For command evals and smoke tests, use one-shot execution:
 
 ```bash
+ralph-town run --json -- pnpx my-pi@latest --help
+ralph-town run --repo https://github.com/owner/repo -- pnpm test
+```
+
+This creates a sandbox, runs the command, captures output, and deletes
+the sandbox automatically.
+
+## Kept Sandbox Workflow
+
+### 1. Create Sandbox
+
+```bash
+ralph-town sandbox create --snapshot ralph-town-dev --json
+```
+
+### 2. SSH Into Sandbox
+
+```bash
+ralph-town sandbox ssh <sandbox-id> --show-secrets
 ssh <token>@ssh.app.daytona.io
 cd /home/daytona
 ```
 
-### 2. Clone Repository
+### 3. Clone Repository
 
 ```bash
 /usr/bin/git clone https://github.com/owner/repo.git
 cd repo
 ```
 
-### 3. Configure Git Identity
+### 4. Configure Git Identity
 
 ```bash
-/usr/bin/git config user.email "teammate@example.com"
-/usr/bin/git config user.name "teammate"
+/usr/bin/git config user.email "sandbox-run@example.invalid"
+/usr/bin/git config user.name "Sandbox Runner"
 ```
 
-### 4. Create Branch and Work
+### 5. Create Branch and Work
 
 ```bash
 /usr/bin/git checkout -b fix/issue-description
 # or
 /usr/bin/git checkout -b feat/feature-name
-
-# make your changes...
 ```
 
-### 5. Commit and Push
+### 6. Verify, Commit, and Push
 
 ```bash
+/usr/local/bin/pnpm run check
 /usr/bin/git add -A
 /usr/bin/git commit -m "fix: describe the change"
 /usr/bin/git push -u origin fix/issue-description
 ```
 
-### 6. Create PR
+### 7. Create PR
 
 ```bash
 /usr/bin/gh pr create --title "Fix: description" --body "Fixes #N"
@@ -59,24 +77,19 @@ cd repo
 | cat  | `/bin/cat`            |
 | echo | `/bin/echo`           |
 
-## PR Best Practices
-
-- Include `Fixes #N` in PR body to auto-close issues
-- Branch naming: `fix/issue-description` or `feat/feature-name`
-- Keep PR title under 70 characters
-
 ## Error Handling
 
 ### SSH Exit Code 255
 
-This is normal for Daytona SSH sessions. Check command output instead
-of exit code.
+Daytona SSH sessions can return 255 even when command output is
+useful. Inspect stdout/stderr before assuming the task failed.
 
-### exec Returns -1
+### SDK exec Returns -1
 
-Known bug with snapshots. Always use SSH, not exec.
+Known bug with snapshot sandboxes. Prefer SSH-backed `ralph-town run`
+or manual SSH for snapshot-based work.
 
 ### Credentials Not Working
 
-Credentials are set up by team-lead BEFORE spawning you. If they don't
-work, report to team-lead immediately - don't try to fix.
+Stop and report the exact failing command and stderr. Do not keep
+trying credential workarounds that may expose tokens.

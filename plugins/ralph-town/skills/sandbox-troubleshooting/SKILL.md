@@ -1,78 +1,61 @@
 ---
 name: sandbox-troubleshooting
 # prettier-ignore
-description: Daytona sandbox troubleshooting. Use for known issues, common mistakes, workarounds.
+description: Troubleshoot Daytona sandbox runs, SSH access, snapshots, credentials, and command execution failures.
 ---
 
 # Sandbox Troubleshooting
 
-## Known Issues
+## Common Issues
 
-| Issue                          | Workaround                                    |
-| ------------------------------ | --------------------------------------------- |
-| SSH PATH broken                | Use full paths: `/usr/bin/git`, `/usr/bin/gh` |
-| `exec` returns -1 on snapshots | Use SSH instead (Daytona bug #2283)           |
-| Work dir is `/home/daytona`    | Not /workspaces                               |
-| SSH exit code 255              | Ignore - check output, not exit code          |
-| `--env` vars not in SSH        | Team-lead sets credentials before spawning    |
+| Symptom                         | Likely Cause                              | Fix                                             |
+| ------------------------------- | ----------------------------------------- | ----------------------------------------------- |
+| `exec` returns `-1`             | Daytona SDK issue on snapshots            | Use SSH-backed `ralph-town run`                 |
+| Command not found over SSH      | PATH is limited                           | Use full paths or export PATH                   |
+| GitHub auth fails in sandbox    | Wrong token context or missing env        | Use `SANDBOX_GH_TOKEN`, forwarded as `GH_TOKEN` |
+| Model API auth fails in sandbox | Local key was not intentionally forwarded | Use `SANDBOX_ANTHROPIC_API_KEY`                 |
+| Snapshot command lacks tools    | Snapshot is stale or missing packages     | Run `sandbox preflight`, rebuild if needed      |
+| Sandbox costs keep rising       | Kept sandbox not deleted                  | `ralph-town sandbox list`, then delete          |
 
-Upstream:
-[daytonaio/daytona#2283](https://github.com/daytonaio/daytona/issues/2283)
+## Prefer Disposable Runs
 
-## Common Mistakes
+For simple evals and smoke tests:
 
-### 1. Not using snapshot
+```bash
+ralph-town run --json -- pnpx my-pi@latest --help
+```
 
-- BAD: `ralph-town sandbox create`
-- GOOD: `ralph-town sandbox create --snapshot ralph-town-dev`
-
-Snapshot has gh, git, pnpm pre-installed.
-
-### 2. Using exec instead of SSH
-
-- BAD: `ralph-town sandbox exec <id> -- git status`
-- GOOD: `ssh <token>@ssh.app.daytona.io "/usr/bin/git status"`
-
-exec returns -1 on snapshots (known bug).
-
-### 3. Not using full paths
-
-- BAD: `git clone ...`
-- GOOD: `/usr/bin/git clone ...`
-
-PATH is broken in SSH sessions.
-
-### 4. Teammate setting up credentials
-
-- BAD: Teammate runs credential setup commands
-- GOOD: Team-lead configures via SSH BEFORE spawning teammate
-
-SSH sessions don't inherit `--env` vars.
-
-### 5. Wrong quoting for $GH_TOKEN
-
-- BAD: `ssh ... '/bin/echo "https://oauth2:$GH_TOKEN@..."'`
-- GOOD: `ssh ... "/bin/echo 'https://oauth2:$GH_TOKEN@...'"`
-
-Single quotes prevent local expansion.
-
-### 6. Token in git URL
-
-- BAD: `git clone https://$GH_TOKEN@github.com/...`
-- GOOD: Use credential helper:
-  ```bash
-  /usr/bin/git config --global credential.helper store
-  /bin/echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
-  ```
-
-Tokens in URLs leak to process list, logs, error messages.
+Use `--keep` only when you need to debug interactively.
 
 ## Full Path Reference
 
-| Tool          | Path                               |
-| ------------- | ---------------------------------- |
-| git           | `/usr/bin/git`                     |
-| gh            | `/usr/bin/gh`                      |
-| pnpm          | `/usr/local/bin/pnpm`              |
-| ls, cat, echo | `/bin/ls`, `/bin/cat`, `/bin/echo` |
-| curl          | `/usr/bin/curl`                    |
+| Tool | Full Path             |
+| ---- | --------------------- |
+| git  | `/usr/bin/git`        |
+| gh   | `/usr/bin/gh`         |
+| pnpm | `/usr/local/bin/pnpm` |
+| curl | `/usr/bin/curl`       |
+
+## Credential Checks
+
+Use nopeek locally:
+
+```bash
+pnpx nopeek audit
+pnpx nopeek load .env --only DAYTONA_API_KEY,SANDBOX_GH_TOKEN,SANDBOX_ANTHROPIC_API_KEY
+```
+
+Do not echo token values.
+
+## Snapshot Checks
+
+```bash
+ralph-town sandbox preflight
+ralph-town sandbox preflight --snapshot <name> --json
+```
+
+If preflight fails, recreate the snapshot:
+
+```bash
+ralph-town sandbox snapshot create --force
+```

@@ -1,19 +1,27 @@
 ---
 name: sandbox
 description:
-  Manage Daytona sandboxes for isolated teammate environments
+  Manage Daytona sandboxes for isolated evals, smoke tests, and
+  command execution.
 ---
 
 # Sandbox Skill
 
-Manage Daytona sandboxes for isolated teammate environments.
+Manage Daytona sandboxes for isolated command execution.
 
-## Commands
+## Preferred One-Shot Command
+
+```bash
+ralph-town run --json -- pnpx my-pi@latest --help
+ralph-town run --repo https://github.com/owner/repo -- pnpm test
+```
+
+## Reusable Sandbox Commands
 
 ### Create Sandbox
 
 ```bash
-ralph-town sandbox create --name <name> --env "GH_TOKEN=..."
+ralph-town sandbox create --name <name>
 ```
 
 ### List Sandboxes
@@ -28,10 +36,10 @@ ralph-town sandbox list
 ralph-town sandbox ssh <id>
 ```
 
-### Execute Command
+### Execute Command In Existing Sandbox
 
 ```bash
-ralph-town sandbox exec <id> -- <command>
+ralph-town sandbox exec <id> <command>
 ```
 
 ### Delete Sandbox
@@ -40,29 +48,18 @@ ralph-town sandbox exec <id> -- <command>
 ralph-town sandbox delete <id>
 ```
 
-## Teammate Workflow
-
-1. Create sandbox with GH_TOKEN
-2. Install gh CLI: `apt-get update && apt-get install -y gh`
-3. Teammate clones repo inside sandbox
-4. Teammate makes changes, commits, pushes
-5. Teammate creates PR via gh CLI
-6. Delete sandbox when done
-
 ## SSH Tips
 
-PATH is broken in SSH sessions. Use full paths:
+PATH can be limited in SSH sessions. Use full paths when commands are
+not found:
 
 ```bash
-ssh <token>@ssh.app.daytona.io "export PATH=/usr/bin:/bin:\$PATH && <command>"
+ssh <token>@ssh.app.daytona.io "export PATH=/usr/bin:/bin:/usr/local/bin:\$PATH && <command>"
 ```
-
-Or prefix commands with `/usr/bin/` or `/bin/`.
 
 ## Known Issues
 
-| Issue              | Workaround                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------- |
-| `exec` returns -1  | Use SSH instead ([upstream#2283](https://github.com/daytonaio/daytona/issues/2283)) |
-| `gh` not installed | `apt-get install -y gh` in sandbox                                                  |
-| PATH broken in SSH | Use full paths                                                                      |
+| Issue              | Workaround                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| `exec` returns -1  | Use SSH-backed `ralph-town run` ([upstream#2283](https://github.com/daytonaio/daytona/issues/2283)) |
+| PATH broken in SSH | Use full paths                                                                                      |
