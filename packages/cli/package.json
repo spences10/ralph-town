@@ -29,7 +29,7 @@
 		"test:watch": "vp test watch"
 	},
 	"dependencies": {
-		"@daytonaio/sdk": "0.173.0",
+		"@daytonaio/sdk": "0.175.0",
 		"citty": "^0.2.0"
 	},
 	"engines": {
