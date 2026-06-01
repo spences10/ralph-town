@@ -4,6 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    tmcp:
+      specifier: ^1.19.4
+      version: 1.19.4
+
 importers:
 
   .:
@@ -40,16 +46,16 @@ importers:
     dependencies:
       '@tmcp/adapter-valibot':
         specifier: ^0.1.5
-        version: 0.1.5(tmcp@1.19.3(typescript@6.0.3))(valibot@1.3.1(typescript@6.0.3))
+        version: 0.1.5(tmcp@1.19.4(typescript@6.0.3))(valibot@1.3.1(typescript@6.0.3))
       '@tmcp/transport-stdio':
         specifier: '*'
-        version: 0.4.2(tmcp@1.19.3(typescript@6.0.3))
+        version: 0.4.2(tmcp@1.19.4(typescript@6.0.3))
       ralph-town:
         specifier: workspace:*
         version: link:../cli
       tmcp:
         specifier: ^1.19.2
-        version: 1.19.3(typescript@6.0.3)
+        version: 1.19.4(typescript@6.0.3)
       valibot:
         specifier: ^1.2.0
         version: 1.3.1(typescript@6.0.3)
@@ -1975,8 +1981,8 @@ packages:
     resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postcss@8.5.14:
-    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
+  postcss@8.5.15:
+    resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
 
   prettier@2.8.8:
@@ -2135,6 +2141,10 @@ packages:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
 
+  tinyglobby@0.2.17:
+    resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
+    engines: {node: '>=12.0.0'}
+
   tinypool@2.1.0:
     resolution: {integrity: sha512-Pugqs6M0m7Lv1I7FtxN4aoyToKg1C4tu+/381vH35y8oENM/Ai7f7C4StcoK4/+BSw9ebcS8jRiVrORFKCALLw==}
     engines: {node: ^20.0.0 || >=22.0.0}
@@ -2143,8 +2153,8 @@ packages:
     resolution: {integrity: sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==}
     engines: {node: '>=14.0.0'}
 
-  tmcp@1.19.3:
-    resolution: {integrity: sha512-plz/TLKNFrdfQN32LjCTN6ULy6pynfGPgHcU7KGCI5dBrxQ9Mub99SmcYuzxEkLjJooQuOD3gosSwZEl1htOtw==}
+  tmcp@1.19.4:
+    resolution: {integrity: sha512-fMoUJ3Gef9iA0yKZNeW2SQCCKTluCwghUyOz/qxPS8XxrQk6Jlw4lgql3S+s6L//FteLeSJ7erKxMWl727mZoQ==}
 
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
@@ -3846,16 +3856,16 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tmcp/adapter-valibot@0.1.5(tmcp@1.19.3(typescript@6.0.3))(valibot@1.3.1(typescript@6.0.3))':
+  '@tmcp/adapter-valibot@0.1.5(tmcp@1.19.4(typescript@6.0.3))(valibot@1.3.1(typescript@6.0.3))':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@valibot/to-json-schema': 1.6.0(valibot@1.3.1(typescript@6.0.3))
-      tmcp: 1.19.3(typescript@6.0.3)
+      tmcp: 1.19.4(typescript@6.0.3)
       valibot: 1.3.1(typescript@6.0.3)
 
-  '@tmcp/transport-stdio@0.4.2(tmcp@1.19.3(typescript@6.0.3))':
+  '@tmcp/transport-stdio@0.4.2(tmcp@1.19.4(typescript@6.0.3))':
     dependencies:
-      tmcp: 1.19.3(typescript@6.0.3)
+      tmcp: 1.19.4(typescript@6.0.3)
 
   '@tybys/wasm-util@0.10.2':
     dependencies:
@@ -4538,7 +4548,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postcss@8.5.14:
+  postcss@8.5.15:
     dependencies:
       nanoid: 3.3.12
       picocolors: 1.1.1
@@ -4718,11 +4728,16 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
 
+  tinyglobby@0.2.17:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
+
   tinypool@2.1.0: {}
 
   tinyrainbow@3.1.0: {}
 
-  tmcp@1.19.3(typescript@6.0.3):
+  tmcp@1.19.4(typescript@6.0.3):
     dependencies:
       '@standard-schema/spec': 1.1.0
       json-rpc-2.0: 1.7.1
@@ -4805,9 +4820,9 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.14
+      postcss: 8.5.15
       rolldown: 1.0.0-rc.17
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 25.6.2
       fsevents: 2.3.3
