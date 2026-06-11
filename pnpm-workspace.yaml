@@ -1,6 +1,8 @@
 packages:
   - packages/*
 
+minimumReleaseAge: 2880
+
 catalogMode: prefer
 
 catalog:
@@ -8,3 +10,9 @@ catalog:
   typescript: ^6.0.0
   vite-plus: ^0.1.18
   vitest: ^4.1.4
+
+allowBuilds:
+  protobufjs: true
+
+onlyBuiltDependencies:
+  - protobufjs
