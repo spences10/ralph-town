@@ -56,9 +56,14 @@ export default defineCommand({
 		);
 
 		try {
-			const result = await wrap_sdk_call(() =>
-				daytona.list(undefined, 1, limit),
-			);
+			const result = await wrap_sdk_call(async () => {
+				const items = [];
+				for await (const sandbox of daytona.list({ limit })) {
+					items.push(sandbox);
+					if (items.length >= limit) break;
+				}
+				return { items };
+			});
 
 			if (args.json) {
 				console.log(
