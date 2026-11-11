@@ -3,7 +3,7 @@
  * Type definitions for Daytona sandbox operations
  */
 
-import type { Image } from '@daytonaio/sdk';
+import type { Image } from '@daytona/sdk';
 
 /**
  * Options for creating a sandbox
@@ -23,6 +23,8 @@ export interface CreateSandboxOptions {
 	labels?: Record<string, string>;
 	/** Auto-stop interval in minutes (0 to disable) */
 	auto_stop_interval?: number;
+	/** Delete automatically when stopped (in addition to explicit cleanup). */
+	ephemeral?: boolean;
 	/** Timeout in seconds for sandbox creation */
 	timeout?: number;
 	/** Callback for build logs */

@@ -1,18 +1,7 @@
-/**
- * sandbox exec command
- * Execute a command in a running sandbox
- */
-
 import { defineCommand } from 'citty';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
-import {
-	BaseCliError,
-	create_daytona_client,
-	is_missing_api_key_error,
-	output_error,
-	SdkError,
-	wrap_sdk_call,
-} from '../../sandbox/index.js';
+import { exec_sandbox } from '../../operations.js';
+import { output_sdk_error } from '../../sandbox/errors.js';
 
 export default defineCommand({
 	meta: {
@@ -30,85 +19,32 @@ export default defineCommand({
 			description: 'Command to execute',
 			required: true,
 		},
-		cwd: {
-			type: 'string',
-			description: 'Working directory',
-		},
+		cwd: { type: 'string', description: 'Working directory' },
 		timeout: {
 			type: 'string',
 			description: 'Execution timeout in seconds (default: 120)',
 		},
-		json: {
-			type: 'boolean',
-			description: 'Output as JSON',
-		},
+		json: { type: 'boolean', description: 'Output as JSON' },
 	},
 	async run({ args }) {
-		let daytona;
-		try {
-			daytona = create_daytona_client();
-		} catch (error) {
-			if (is_missing_api_key_error(error)) {
-				output_error(
-					{
-						error: true,
-						code: 'MISSING_API_KEY',
-						message: (error as Error).message,
-					},
-					!!args.json,
-				);
-				return;
-			}
-			throw error;
-		}
-
-		const timeout_sec = parse_int_flag_or_exit(
+		const timeout = parse_int_flag_or_exit(
 			args.timeout,
 			'timeout',
 			120,
 			args.json,
 		);
-
 		try {
-			const sandbox = await wrap_sdk_call(
-				() => daytona.get(args.id),
+			const result = await exec_sandbox(
 				args.id,
+				args.cmd,
+				args.cwd,
+				timeout,
 			);
-
-			// executeCommand currently returns combined command output in
-			// result/artifacts.stdout. The disposable `run` command wraps
-			// execution to recover separate stdout/stderr streams.
-			const result = await wrap_sdk_call(() =>
-				sandbox.process.executeCommand(
-					args.cmd,
-					args.cwd,
-					undefined,
-					timeout_sec,
-				),
-			);
-
-			if (args.json) {
-				console.log(
-					JSON.stringify({
-						exit_code: result.exitCode,
-						stdout: result.result,
-					}),
-				);
-			} else {
-				if (result.result) {
-					console.log(result.result);
-				}
-				if (result.exitCode !== 0) {
-					process.exitCode = result.exitCode;
-					return;
-				}
-			}
+			if (args.json) console.log(JSON.stringify(result));
+			else if (result.stdout) console.log(result.stdout);
+			process.exitCode = result.exit_code;
 		} catch (error) {
-			if (error instanceof BaseCliError) {
-				output_error(error, !!args.json);
-				return;
-			}
-			output_error(SdkError.from(error), !!args.json);
+			output_sdk_error(error, !!args.json);
 		}
 	},
 });

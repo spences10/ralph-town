@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
 	build_exec_wrapper,
 	build_remote_command,
-	command_from_raw_args,
 	parse_exec_wrapper_output,
-} from './run.js';
+} from '../sandbox/run.js';
+import { command_from_raw_args } from './run.js';
 
 describe('command_from_raw_args', () => {
 	it('requires a -- separator before the command', () => {

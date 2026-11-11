@@ -5,14 +5,8 @@
 
 import { defineCommand } from 'citty';
 import { parse_int_flag_or_exit } from '../../core/utils.js';
-import {
-	BaseCliError,
-	create_daytona_client,
-	is_missing_api_key_error,
-	output_error,
-	SdkError,
-	wrap_sdk_call,
-} from '../../sandbox/index.js';
+import { get_ssh_access } from '../../operations.js';
+import { output_sdk_error } from '../../sandbox/errors.js';
 
 export const REDACTED = '***REDACTED***';
 
@@ -46,24 +40,6 @@ export default defineCommand({
 		},
 	},
 	async run({ args }) {
-		let daytona;
-		try {
-			daytona = create_daytona_client();
-		} catch (error) {
-			if (is_missing_api_key_error(error)) {
-				output_error(
-					{
-						error: true,
-						code: 'MISSING_API_KEY',
-						message: (error as Error).message,
-					},
-					!!args.json,
-				);
-				return;
-			}
-			throw error;
-		}
-
 		const expires_minutes = parse_int_flag_or_exit(
 			args.expires,
 			'expires',
@@ -72,13 +48,7 @@ export default defineCommand({
 		);
 
 		try {
-			const sandbox = await wrap_sdk_call(
-				() => daytona.get(args.id),
-				args.id,
-			);
-			const access = await wrap_sdk_call(() =>
-				sandbox.createSshAccess(expires_minutes),
-			);
+			const access = await get_ssh_access(args.id, expires_minutes);
 			const show_secrets = args['show-secrets'];
 
 			if (args.json) {
@@ -88,9 +58,7 @@ export default defineCommand({
 						token: display_token,
 						token_masked: !show_secrets,
 						command: 'ssh ' + display_token + '@ssh.app.daytona.io',
-						expires_at: new Date(
-							Date.now() + expires_minutes * 60 * 1000,
-						).toISOString(),
+						expires_at: new Date(access.expiresAt).toISOString(),
 					}),
 				);
 			} else {
@@ -116,11 +84,7 @@ export default defineCommand({
 				}
 			}
 		} catch (error) {
-			if (error instanceof BaseCliError) {
-				output_error(error, !!args.json);
-				return;
-			}
-			output_error(SdkError.from(error), !!args.json);
+			output_sdk_error(error, !!args.json);
 		}
 	},
 });

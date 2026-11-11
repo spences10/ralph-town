@@ -3,7 +3,7 @@
  * Create the ralph-town-dev snapshot with Node.js, pnpm, and common CLI tooling pre-installed
  */
 
-import { Daytona, Image } from '@daytonaio/sdk';
+import { Daytona, Image } from '@daytona/sdk';
 import { defineCommand } from 'citty';
 
 const DEFAULT_SNAPSHOT_NAME = 'ralph-town-dev';

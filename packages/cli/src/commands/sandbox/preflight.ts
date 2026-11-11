@@ -6,7 +6,7 @@
  * `sandbox ssh`. Disposable `run` uses Daytona's process API instead.
  */
 
-import { Daytona } from '@daytonaio/sdk';
+import { Daytona } from '@daytona/sdk';
 import { defineCommand } from 'citty';
 import { spawn } from 'node:child_process';
 

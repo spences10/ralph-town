@@ -13,11 +13,12 @@ import { parse_int_flag_or_exit } from '../../core/utils.js';
 import type { Sandbox } from '../../sandbox/index.js';
 import {
 	BaseCliError,
-	create_sandbox,
 	is_missing_api_key_error,
 	output_error,
 	SdkError,
 } from '../../sandbox/index.js';
+
+import { create_sandbox } from '../../operations.js';
 
 const REDACTED = '***REDACTED***';
 
@@ -48,6 +49,10 @@ export default defineCommand({
 		'auto-stop': {
 			type: 'string',
 			description: 'Auto-stop interval in minutes (0 to disable)',
+		},
+		ephemeral: {
+			type: 'boolean',
+			description: 'Delete the sandbox automatically when stopped',
 		},
 		timeout: {
 			type: 'string',
@@ -127,6 +132,7 @@ export default defineCommand({
 				snapshot: args.snapshot,
 				image: args.image,
 				auto_stop_interval: auto_stop,
+				ephemeral: args.ephemeral,
 				timeout,
 				env_vars:
 					Object.keys(env_vars).length > 0 ? env_vars : undefined,

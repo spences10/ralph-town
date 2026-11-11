@@ -3,11 +3,7 @@
  * Wraps a Daytona sandbox with convenient methods
  */
 
-import type {
-	Daytona,
-	Sandbox as DaytonaSandbox,
-} from '@daytonaio/sdk';
-import { with_retry } from './errors.js';
+import type { Sandbox as DaytonaSandbox } from '@daytona/sdk';
 import type { ExecuteResult, ISandbox, SshAccess } from './types.js';
 
 /** Default SSH access expiration in minutes */
@@ -22,11 +18,9 @@ const DEFAULT_COMMAND_TIMEOUT = 120;
  * Implements ISandbox interface for provider compatibility
  */
 export class Sandbox implements ISandbox {
-	private readonly daytona: Daytona;
 	private readonly sandbox: DaytonaSandbox;
 
-	constructor(daytona: Daytona, sandbox: DaytonaSandbox) {
-		this.daytona = daytona;
+	constructor(sandbox: DaytonaSandbox) {
 		this.sandbox = sandbox;
 	}
 
@@ -52,9 +46,8 @@ export class Sandbox implements ISandbox {
 	async get_ssh_access(
 		expires_minutes: number = DEFAULT_SSH_EXPIRES_MINUTES,
 	): Promise<SshAccess> {
-		const access = await with_retry(() =>
-			this.sandbox.createSshAccess(expires_minutes),
-		);
+		const access =
+			await this.sandbox.createSshAccess(expires_minutes);
 		return {
 			token: access.token,
 			command: access.sshCommand,
@@ -75,13 +68,11 @@ export class Sandbox implements ISandbox {
 		timeout_sec: number = DEFAULT_COMMAND_TIMEOUT,
 	): Promise<ExecuteResult> {
 		try {
-			const result = await with_retry(() =>
-				this.sandbox.process.executeCommand(
-					cmd,
-					cwd,
-					undefined,
-					timeout_sec,
-				),
+			const result = await this.sandbox.process.executeCommand(
+				cmd,
+				cwd,
+				undefined,
+				timeout_sec,
 			);
 			return {
 				stdout: result.result,
@@ -108,7 +99,7 @@ export class Sandbox implements ISandbox {
 	): Promise<void> {
 		const buf =
 			typeof content === 'string' ? Buffer.from(content) : content;
-		await with_retry(() => this.sandbox.fs.uploadFile(buf, path));
+		await this.sandbox.fs.uploadFile(buf, path);
 	}
 
 	/**
@@ -117,9 +108,7 @@ export class Sandbox implements ISandbox {
 	 * @returns File content as Buffer
 	 */
 	async download_file(path: string): Promise<Buffer> {
-		const content = await with_retry(() =>
-			this.sandbox.fs.downloadFile(path),
-		);
+		const content = await this.sandbox.fs.downloadFile(path);
 		return Buffer.from(content);
 	}
 
@@ -128,7 +117,7 @@ export class Sandbox implements ISandbox {
 	 * @param timeout - Timeout in seconds (default: 60)
 	 */
 	async delete(timeout: number = 60): Promise<void> {
-		await with_retry(() => this.sandbox.delete(timeout));
+		await this.sandbox.delete(timeout);
 	}
 
 	/**

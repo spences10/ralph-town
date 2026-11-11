@@ -4,6 +4,8 @@
  */
 
 /** Standard CLI error output format */
+import { is_missing_api_key_error } from './client.js';
+
 export interface CliError {
 	error: true;
 	code: string;
@@ -80,51 +82,22 @@ export function is_sandbox_not_found(error: unknown): boolean {
 	);
 }
 
-/** Check if error is a transient network failure that can be retried */
-export function is_transient_error(error: unknown): boolean {
-	if (!(error instanceof Error)) return false;
-	const msg = error.message.toLowerCase();
-	return (
-		msg.includes('econnreset') ||
-		msg.includes('econnrefused') ||
-		msg.includes('etimedout') ||
-		msg.includes('enotfound') ||
-		msg.includes('socket hang up') ||
-		msg.includes('network') ||
-		msg.includes('timeout') ||
-		msg.includes('503') ||
-		msg.includes('502') ||
-		msg.includes('429')
-	);
-}
-
-/**
- * Retry a function with exponential backoff for transient failures
- * @param fn - Async function to retry
- * @param max_attempts - Maximum number of attempts (default: 3)
- * @param delay_ms - Base delay between retries in ms (default: 1000)
- * @returns Result of the function
- */
-export async function with_retry<T>(
-	fn: () => Promise<T>,
-	max_attempts: number = 3,
-	delay_ms: number = 1000,
-): Promise<T> {
-	let last_error: Error | undefined;
-	for (let attempt = 1; attempt <= max_attempts; attempt++) {
-		try {
-			return await fn();
-		} catch (error) {
-			last_error = error as Error;
-			if (!is_transient_error(error) || attempt >= max_attempts) {
-				throw last_error;
-			}
-			await new Promise((resolve) =>
-				setTimeout(resolve, delay_ms * attempt),
-			);
-		}
+/** Format shared-operation failures at the CLI boundary. */
+export function output_sdk_error(
+	error: unknown,
+	json: boolean,
+): void {
+	if (is_missing_api_key_error(error)) {
+		output_error(
+			{ error: true, code: error.code, message: error.message },
+			json,
+		);
+	} else {
+		output_error(
+			error instanceof BaseCliError ? error : SdkError.from(error),
+			json,
+		);
 	}
-	throw last_error;
 }
 
 /** Wrap SDK call with consistent error handling */

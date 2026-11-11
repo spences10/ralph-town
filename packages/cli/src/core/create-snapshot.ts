@@ -5,7 +5,7 @@
  * Usage: ralph-town sandbox snapshot create --force
  */
 
-import { Daytona, Image } from '@daytonaio/sdk';
+import { Daytona, Image } from '@daytona/sdk';
 
 const SNAPSHOT_NAME = 'ralph-town-dev';
 

@@ -3,7 +3,7 @@
  * Creates Daytona client with proper error handling for missing credentials
  */
 
-import { Daytona } from '@daytonaio/sdk';
+import { Daytona } from '@daytona/sdk';
 
 /** Environment variable name for API key */
 const API_KEY_ENV_VAR = 'DAYTONA_API_KEY';

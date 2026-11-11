@@ -3,9 +3,7 @@ import {
 	SandboxNotFoundError,
 	SdkError,
 	is_sandbox_not_found,
-	is_transient_error,
 	output_error,
-	with_retry,
 	wrap_sdk_call,
 } from './errors.js';
 
@@ -37,15 +35,6 @@ describe('error classification', () => {
 		expect(is_sandbox_not_found(new Error('timeout'))).toBe(false);
 		expect(is_sandbox_not_found('not found')).toBe(false);
 	});
-
-	it('detects transient network errors', () => {
-		for (const message of ['ECONNRESET', 'ETIMEDOUT', 'HTTP 503']) {
-			expect(is_transient_error(new Error(message))).toBe(true);
-		}
-		expect(is_transient_error(new Error('invalid request'))).toBe(
-			false,
-		);
-	});
 });
 
 describe('output_error', () => {
@@ -75,31 +64,6 @@ describe('output_error', () => {
 		output_error(new SdkError('failed'), false);
 
 		expect(spy).toHaveBeenCalledWith('Error: failed');
-	});
-});
-
-describe('with_retry', () => {
-	it('retries transient failures and returns the successful result', async () => {
-		let attempts = 0;
-		const fn = vi.fn(async () => {
-			attempts++;
-			if (attempts < 2) throw new Error('ECONNRESET');
-			return 'ok';
-		});
-
-		await expect(with_retry(fn, 2, 1)).resolves.toBe('ok');
-		expect(fn).toHaveBeenCalledTimes(2);
-	});
-
-	it('does not retry non-transient failures', async () => {
-		const fn = vi.fn(async () => {
-			throw new Error('invalid request');
-		});
-
-		await expect(with_retry(fn, 3, 1)).rejects.toThrow(
-			'invalid request',
-		);
-		expect(fn).toHaveBeenCalledTimes(1);
 	});
 });
 

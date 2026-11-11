@@ -18,6 +18,13 @@
 	],
 	"type": "module",
 	"main": "dist/index.js",
+	"exports": {
+		".": "./dist/index.js",
+		"./operations": {
+			"types": "./dist/operations.d.ts",
+			"import": "./dist/operations.js"
+		}
+	},
 	"scripts": {
 		"build": "vp pack",
 		"dev": "vp pack --watch",
@@ -29,7 +36,7 @@
 		"test:watch": "vp test watch"
 	},
 	"dependencies": {
-		"@daytonaio/sdk": "0.230.0",
+		"@daytona/sdk": "0.230.0",
 		"citty": "^0.2.0"
 	},
 	"engines": {
