@@ -1,16 +1,8 @@
 import { ValibotJsonSchemaAdapter } from '@tmcp/adapter-valibot';
 import { McpServer } from 'tmcp';
 import pkg from '../package.json' with { type: 'json' };
-import {
-	sandbox_create_tool,
-	sandbox_delete_tool,
-	sandbox_env_list_tool,
-	sandbox_env_set_tool,
-	sandbox_exec_tool,
-	sandbox_list_tool,
-	sandbox_run_tool,
-	sandbox_ssh_tool,
-} from './tools/index.js';
+import { register_codemode } from './codemode.js';
+import { create_sandbox_tools } from './tools/index.js';
 
 export function create_server() {
 	const adapter = new ValibotJsonSchemaAdapter();
@@ -29,17 +21,8 @@ export function create_server() {
 		},
 	);
 
-	// Register sandbox tools
-	server.tools([
-		sandbox_create_tool,
-		sandbox_list_tool,
-		sandbox_run_tool,
-		sandbox_ssh_tool,
-		sandbox_delete_tool,
-		sandbox_exec_tool,
-		sandbox_env_list_tool,
-		sandbox_env_set_tool,
-	]);
+	server.tools(create_sandbox_tools(() => server.ctx.signal));
+	register_codemode(server);
 
 	return server;
 }

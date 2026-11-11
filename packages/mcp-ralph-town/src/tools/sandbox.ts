@@ -1,350 +1,20 @@
-/**
- * Sandbox MCP Tools
- * Tools for managing Daytona sandboxes via the CLI
- */
-
-import { spawn } from 'node:child_process';
-import { isAbsolute } from 'node:path';
+import {
+	create_sandbox,
+	delete_sandbox,
+	exec_sandbox,
+	get_ssh_access,
+	list_sandbox_env,
+	list_sandboxes,
+	normalize_sandbox_env,
+	run_sandbox,
+	set_sandbox_env,
+} from 'ralph-town/operations';
 import { defineTool } from 'tmcp/tool';
 import { tool } from 'tmcp/utils';
 import * as v from 'valibot';
 
-function get_cli_path(): string {
-	const env_path = process.env.RALPH_TOWN_CLI_PATH;
-	if (!env_path) {
-		return 'ralph-town';
-	}
-	// Allow 'ralph-town' explicitly, otherwise require absolute path
-	if (env_path !== 'ralph-town' && !isAbsolute(env_path)) {
-		throw new Error(
-			`RALPH_TOWN_CLI_PATH must be an absolute path, got: ${env_path}`,
-		);
-	}
-	return env_path;
-}
-
-const cli_path = get_cli_path();
-
-// Per-tool timeout constants
-const QUICK_TIMEOUT_MS = 30000; // 30 seconds for quick ops (list, ssh, delete)
-const DEFAULT_TIMEOUT_MS = 120000; // 2 minutes for standard ops (create, exec)
-const RUN_TIMEOUT_MS = 600000; // 10 minutes for disposable sandbox runs
-
-/**
- * Execute CLI command and return result
- */
-function run_cli(
-	args: string[],
-	timeout_ms: number = DEFAULT_TIMEOUT_MS,
-): Promise<{ stdout: string; stderr: string; exit_code: number }> {
-	return new Promise((resolve) => {
-		const proc = spawn(cli_path, args, {
-			stdio: ['ignore', 'pipe', 'pipe'],
-		});
-
-		let stdout = '';
-		let stderr = '';
-		let timed_out = false;
-
-		const timeout_id = setTimeout(() => {
-			timed_out = true;
-			proc.kill('SIGTERM');
-			setTimeout(() => {
-				if (!proc.killed) {
-					proc.kill('SIGKILL');
-				}
-			}, 5000);
-		}, timeout_ms);
-
-		proc.stdout?.on('data', (data) => {
-			stdout += data.toString();
-		});
-
-		proc.stderr?.on('data', (data) => {
-			stderr += data.toString();
-		});
-
-		proc.on('close', (code) => {
-			clearTimeout(timeout_id);
-			if (timed_out) {
-				resolve({
-					stdout,
-					stderr: `Command timed out after ${timeout_ms}ms\n${stderr}`,
-					exit_code: 124,
-				});
-			} else {
-				resolve({ stdout, stderr, exit_code: code ?? 1 });
-			}
-		});
-
-		proc.on('error', (err) => {
-			clearTimeout(timeout_id);
-			resolve({
-				stdout: '',
-				stderr: err.message,
-				exit_code: 1,
-			});
-		});
-	});
-}
-
-/**
- * sandbox_create - Create a new Daytona sandbox
- */
-export const sandbox_create_tool = defineTool(
-	{
-		name: 'sandbox_create',
-		description:
-			'Create a new Daytona sandbox with pre-baked image (node:22-bookworm-slim with git, pnpm, typescript, tsx). Options: image (base Docker image), name (sandbox label), auto_stop (minutes, 0 to disable), timeout (seconds, default 120), snapshot (snapshot ID to create from), env (environment variables as KEY=value)',
-		schema: v.object({
-			image: v.optional(v.pipe(v.string(), v.minLength(1))),
-			name: v.optional(v.pipe(v.string(), v.minLength(1))),
-			auto_stop: v.optional(v.number()),
-			timeout: v.optional(v.number()),
-			snapshot: v.optional(v.pipe(v.string(), v.minLength(1))),
-			env: v.optional(v.array(v.pipe(v.string(), v.minLength(1)))),
-		}),
-	},
-	async ({ image, name, auto_stop, timeout, snapshot, env }) => {
-		const args = ['sandbox', 'create', '--json'];
-
-		if (image) {
-			args.push('--image', image);
-		}
-		if (name) {
-			args.push('--name', name);
-		}
-		if (auto_stop !== undefined) {
-			args.push('--auto-stop', String(auto_stop));
-		}
-		if (timeout !== undefined) {
-			args.push('--timeout', String(timeout));
-		}
-		if (snapshot) {
-			args.push('--snapshot', snapshot);
-		}
-		if (env && env.length > 0) {
-			for (const e of env) {
-				args.push('--env', e);
-			}
-		}
-
-		const result = await run_cli(args, DEFAULT_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				const sandbox = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(sandbox, null, 2));
-			} catch {
-				return tool.text(
-					result.stdout || 'Sandbox created successfully',
-				);
-			}
-		} else {
-			return tool.error(
-				`Failed to create sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
-
-/**
- * sandbox_run - Run a command in a fresh disposable sandbox
- */
-export const sandbox_run_tool = defineTool(
-	{
-		name: 'sandbox_run',
-		description:
-			'Create a fresh Daytona sandbox, run a command, and delete it by default. Best for LLM evals, CLI smoke tests, and isolated command execution. Required: command. Options: snapshot, image, name, repo, branch, cwd, timeout, keep, env.',
-		schema: v.object({
-			command: v.pipe(v.string(), v.minLength(1)),
-			snapshot: v.optional(v.pipe(v.string(), v.minLength(1))),
-			image: v.optional(v.pipe(v.string(), v.minLength(1))),
-			name: v.optional(v.pipe(v.string(), v.minLength(1))),
-			repo: v.optional(v.pipe(v.string(), v.minLength(1))),
-			branch: v.optional(v.pipe(v.string(), v.minLength(1))),
-			cwd: v.optional(v.pipe(v.string(), v.minLength(1))),
-			timeout: v.optional(v.number()),
-			keep: v.optional(v.boolean()),
-			env: v.optional(v.array(v.pipe(v.string(), v.minLength(1)))),
-		}),
-	},
-	async ({
-		command,
-		snapshot,
-		image,
-		name,
-		repo,
-		branch,
-		cwd,
-		timeout,
-		keep,
-		env,
-	}) => {
-		const args = ['run', '--json'];
-
-		if (snapshot) args.push('--snapshot', snapshot);
-		if (image) args.push('--image', image);
-		if (name) args.push('--name', name);
-		if (repo) args.push('--repo', repo);
-		if (branch) args.push('--branch', branch);
-		if (cwd) args.push('--cwd', cwd);
-		if (timeout !== undefined)
-			args.push('--timeout', String(timeout));
-		if (keep) args.push('--keep');
-		if (env && env.length > 0) {
-			for (const e of env) {
-				args.push('--env', e);
-			}
-		}
-		args.push('--', command);
-
-		const result = await run_cli(args, RUN_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				return tool.text(
-					JSON.stringify(JSON.parse(result.stdout), null, 2),
-				);
-			} catch {
-				return tool.text(result.stdout);
-			}
-		}
-
-		try {
-			const parsed = JSON.parse(result.stdout);
-			return tool.error(JSON.stringify(parsed, null, 2));
-		} catch {
-			return tool.error(
-				`Sandbox run failed (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
-
-/**
- * sandbox_list - List active sandboxes
- */
-export const sandbox_list_tool = defineTool(
-	{
-		name: 'sandbox_list',
-		description:
-			'List active Daytona sandboxes. Options: limit (max sandboxes to list, default 20)',
-		schema: v.object({
-			limit: v.optional(v.number()),
-		}),
-	},
-	async ({ limit }) => {
-		const args = ['sandbox', 'list', '--json'];
-
-		if (limit !== undefined) {
-			args.push('--limit', String(limit));
-		}
-
-		const result = await run_cli(args, QUICK_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				const sandboxes = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(sandboxes, null, 2));
-			} catch {
-				return tool.text(result.stdout);
-			}
-		} else {
-			return tool.error(
-				`Failed to list sandboxes (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
-
-/**
- * sandbox_ssh - Get SSH credentials for a sandbox
- */
-export const sandbox_ssh_tool = defineTool(
-	{
-		name: 'sandbox_ssh',
-		description:
-			'Get SSH command and token for connecting to a sandbox. Required: id (sandbox ID or name). Options: expires (token expiration in minutes, default 60)',
-		schema: v.object({
-			id: v.pipe(v.string(), v.minLength(1)),
-			expires: v.optional(v.number()),
-		}),
-	},
-	async ({ id, expires }) => {
-		const args = ['sandbox', 'ssh', id, '--json'];
-
-		if (expires !== undefined) {
-			args.push('--expires', String(expires));
-		}
-
-		const result = await run_cli(args, QUICK_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				const ssh_info = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(ssh_info, null, 2));
-			} catch {
-				return tool.text(result.stdout);
-			}
-		} else {
-			return tool.error(
-				`Failed to get SSH access (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
-
-/**
- * sandbox_delete - Delete a sandbox
- */
-export const sandbox_delete_tool = defineTool(
-	{
-		name: 'sandbox_delete',
-		description:
-			'Delete a Daytona sandbox. Required: id (sandbox ID or name). Options: timeout (deletion timeout in seconds, default 60)',
-		schema: v.object({
-			id: v.pipe(v.string(), v.minLength(1)),
-			timeout: v.optional(v.number()),
-		}),
-	},
-	async ({ id, timeout }) => {
-		const args = ['sandbox', 'delete', id, '--json'];
-
-		if (timeout !== undefined) {
-			args.push('--timeout', String(timeout));
-		}
-
-		const result = await run_cli(args, QUICK_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				const delete_result = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(delete_result, null, 2));
-			} catch {
-				return tool.text(
-					result.stdout || `Sandbox ${id} deleted successfully`,
-				);
-			}
-		} else {
-			return tool.error(
-				`Failed to delete sandbox (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
-
-/**
- * Security: Allowlist of safe command patterns for sandbox_exec
- *
- * Commands are validated against this allowlist before execution.
- * The first word of the command (the binary) must match one of these patterns.
- *
- * NOTE: Future enhancements could include:
- * - Rate limiting (e.g., max 10 commands per minute per sandbox)
- * - Command argument validation for specific commands
- * - Configurable allowlist via environment variable
- */
+// Preserve the existing MCP command filter. It checks only the first word,
+// not shell syntax, and is not a security boundary.
 const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
 	// Version control
 	/^git$/,
@@ -453,169 +123,261 @@ export function is_command_allowed(cmd: string): boolean {
 	);
 }
 
-/**
- * Audit log entry for command execution
- */
-interface AuditLogEntry {
-	timestamp: string;
-	sandbox_id: string;
-	command: string;
-	allowed: boolean;
-	exit_code?: number;
+const nonempty = v.pipe(v.string(), v.minLength(1));
+const env_schema = v.optional(
+	v.array(v.pipe(v.string(), v.regex(/^[^=]+=/))),
+);
+const create_fields = {
+	image: v.optional(nonempty),
+	name: v.optional(nonempty),
+	auto_stop: v.optional(v.number()),
+	timeout: v.optional(v.number()),
+	snapshot: v.optional(nonempty),
+	env: env_schema,
+};
+
+function env_from_entries(entries: string[] = []) {
+	return normalize_sandbox_env(
+		Object.fromEntries(
+			entries.map((entry) => {
+				const separator = entry.indexOf('=');
+				return [
+					entry.slice(0, separator),
+					entry.slice(separator + 1),
+				];
+			}),
+		),
+	);
 }
 
-/**
- * Log command execution for audit purposes
- * Currently logs to console; could be extended to log to file or external service
- */
-function log_command_audit(entry: AuditLogEntry): void {
-	const log_line = JSON.stringify({
-		...entry,
-		type: 'sandbox_exec_audit',
-	});
-	console.error(`[AUDIT] ${log_line}`);
+/** One schema and handler for direct MCP calls and Code Mode calls. */
+function define_operation<
+	S extends v.GenericSchema<Record<string, unknown>>,
+>(
+	name: string,
+	description: string,
+	schema: S,
+	handler: (
+		args: v.InferOutput<S>,
+		signal?: AbortSignal,
+	) => Promise<unknown>,
+): {
+	name: string;
+	description: string;
+	schema: v.GenericSchema<Record<string, unknown>>;
+	execute(input: unknown, signal?: AbortSignal): Promise<unknown>;
+} {
+	return {
+		name,
+		description,
+		schema,
+		execute(input: unknown, signal?: AbortSignal) {
+			signal?.throwIfAborted();
+			return handler(v.parse(schema, input), signal);
+		},
+	};
 }
 
-/**
- * sandbox_exec - Execute command in a sandbox
- *
- * SECURITY WARNING: This tool executes arbitrary commands in a sandbox.
- * While sandboxes provide isolation, commands are validated against an
- * allowlist to prevent obviously dangerous operations. All executions
- * are logged for audit purposes.
- */
-export const sandbox_exec_tool = defineTool(
-	{
-		name: 'sandbox_exec',
-		description:
-			'Execute a command in a Daytona sandbox. SECURITY: Commands are validated against an allowlist of safe patterns (git, ls, cat, pnpm, npm, etc.). Dangerous commands will be rejected. All commands are logged for audit purposes. Required: id (sandbox ID or name), cmd (command to execute). Options: cwd (working directory), timeout (command timeout in seconds, default 120)',
-		schema: v.object({
-			id: v.pipe(v.string(), v.minLength(1)),
-			cmd: v.pipe(v.string(), v.minLength(1)),
-			cwd: v.optional(v.pipe(v.string(), v.minLength(1))),
+export const sandbox_operations = [
+	define_operation(
+		'sandbox_create',
+		'Create a Daytona sandbox. Default image includes Node, git and pnpm. env entries use KEY=value. ephemeral deletes on stop.',
+		v.object({
+			...create_fields,
+			ephemeral: v.optional(v.boolean()),
+		}),
+		async (
+			{ image, name, auto_stop, timeout, snapshot, env, ephemeral },
+			signal,
+		) => {
+			const sandbox = await create_sandbox({
+				image,
+				name,
+				timeout,
+				snapshot,
+				ephemeral,
+				auto_stop_interval: auto_stop,
+				env_vars: env_from_entries(env),
+			});
+			try {
+				signal?.throwIfAborted();
+				const work_dir = await sandbox.get_work_dir();
+				signal?.throwIfAborted();
+				return {
+					id: sandbox.id,
+					state: sandbox.state,
+					work_dir: work_dir ?? null,
+				};
+			} catch (error) {
+				try {
+					await sandbox.delete();
+				} catch (cleanup_error) {
+					throw new AggregateError(
+						[error, cleanup_error],
+						`Sandbox creation failed; cleanup failed for ${sandbox.id}: ${String(cleanup_error)}`,
+					);
+				}
+				throw error;
+			}
+		},
+	),
+	define_operation(
+		'sandbox_list',
+		'List Daytona sandboxes (default limit 20).',
+		v.object({ limit: v.optional(v.number()) }),
+		({ limit }) => list_sandboxes(limit),
+	),
+	define_operation(
+		'sandbox_run',
+		'Run a command in a fresh sandbox and delete it by default. Returns stdout, stderr, exit_code, timed_out and cleanup_error. Non-zero command exits are data; API failures throw. env entries use KEY=value.',
+		v.object({
+			...create_fields,
+			command: nonempty,
+			repo: v.optional(nonempty),
+			branch: v.optional(nonempty),
+			cwd: v.optional(nonempty),
+			keep: v.optional(v.boolean()),
+			create_timeout: v.optional(v.number()),
+			delete_timeout: v.optional(v.number()),
+		}),
+		(
+			{
+				command,
+				image,
+				name,
+				auto_stop,
+				timeout,
+				snapshot,
+				env,
+				repo,
+				branch,
+				cwd,
+				keep,
+				create_timeout,
+				delete_timeout,
+			},
+			signal,
+		) =>
+			run_sandbox(
+				{
+					command,
+					image,
+					name,
+					timeout,
+					snapshot,
+					repo,
+					branch,
+					cwd,
+					keep,
+					create_timeout,
+					delete_timeout,
+					auto_stop_interval: auto_stop,
+					env_vars: env_from_entries(env),
+				},
+				signal,
+			),
+	),
+	define_operation(
+		'sandbox_ssh',
+		'Get masked SSH connection details. Use the CLI sandbox ssh --show-secrets to obtain the token.',
+		v.object({ id: nonempty, expires: v.optional(v.number()) }),
+		async ({ id, expires }) => {
+			const access = await get_ssh_access(id, expires);
+			return {
+				token: '***REDACTED***',
+				token_masked: true,
+				command: 'ssh ***REDACTED***@ssh.app.daytona.io',
+				expires_at: new Date(access.expiresAt).toISOString(),
+			};
+		},
+	),
+	define_operation(
+		'sandbox_delete',
+		'Delete a Daytona sandbox.',
+		v.object({ id: nonempty, timeout: v.optional(v.number()) }),
+		({ id, timeout }) => delete_sandbox(id, timeout),
+	),
+	define_operation(
+		'sandbox_exec',
+		'Execute in an existing sandbox. Returns exit_code and combined output as stdout. The existing first-word command filter applies; it is not a shell security boundary. Commands are audit logged.',
+		v.object({
+			id: nonempty,
+			cmd: nonempty,
+			cwd: v.optional(nonempty),
 			timeout: v.optional(v.number()),
 		}),
-	},
-	async ({ id, cmd, cwd, timeout }) => {
-		const timestamp = new Date().toISOString();
-
-		// Security: Validate command against allowlist
-		const allowed = is_command_allowed(cmd);
-
-		// Log the attempt (regardless of whether it's allowed)
-		log_command_audit({
-			timestamp,
-			sandbox_id: id,
-			command: cmd,
-			allowed,
-		});
-
-		if (!allowed) {
-			return tool.error(
-				`Command not allowed: "${cmd.split(/\s+/)[0]}". ` +
-					'Only allowlisted commands (git, ls, cat, pnpm, npm, node, etc.) are permitted. ' +
-					'See documentation for the full allowlist.',
+		async ({ id, cmd, cwd, timeout }) => {
+			const allowed = is_command_allowed(cmd);
+			console.error(
+				'[AUDIT]',
+				JSON.stringify({
+					type: 'sandbox_exec_audit',
+					timestamp: new Date().toISOString(),
+					sandbox_id: id,
+					command: cmd,
+					allowed,
+				}),
 			);
-		}
-
-		const args = ['sandbox', 'exec', id, cmd, '--json'];
-
-		if (cwd) {
-			args.push('--cwd', cwd);
-		}
-		if (timeout !== undefined) {
-			args.push('--timeout', String(timeout));
-		}
-
-		const result = await run_cli(args, DEFAULT_TIMEOUT_MS);
-
-		// Log the result
-		log_command_audit({
-			timestamp: new Date().toISOString(),
-			sandbox_id: id,
-			command: cmd,
-			allowed: true,
-			exit_code: result.exit_code,
-		});
-
-		if (result.exit_code === 0) {
-			try {
-				const exec_result = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(exec_result, null, 2));
-			} catch {
-				return tool.text(result.stdout);
-			}
-		} else {
-			return tool.error(
-				`Command failed (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
+			if (!allowed)
+				throw new Error(
+					`Command not allowed: "${cmd.trim().split(/\s+/)[0]}"`,
+				);
+			const result = await exec_sandbox(id, cmd, cwd, timeout);
+			console.error(
+				'[AUDIT]',
+				JSON.stringify({
+					type: 'sandbox_exec_audit',
+					timestamp: new Date().toISOString(),
+					sandbox_id: id,
+					command: cmd,
+					allowed,
+					exit_code: result.exit_code,
+				}),
 			);
-		}
-	},
-);
+			return result;
+		},
+	),
+	define_operation(
+		'sandbox_env_list',
+		'List the current environment inherited by new sandbox processes. Values may contain secrets.',
+		v.object({ id: nonempty }),
+		({ id }) => list_sandbox_env(id),
+	),
+	define_operation(
+		'sandbox_env_set',
+		'Set a sandbox environment variable for new processes, sessions and PTYs. Existing processes are unchanged.',
+		v.object({ id: nonempty, key: nonempty, value: v.string() }),
+		({ id, key, value }) => set_sandbox_env(id, key, value),
+	),
+];
 
-/**
- * sandbox_env_list - List environment variables for a sandbox
- */
-export const sandbox_env_list_tool = defineTool(
-	{
-		name: 'sandbox_env_list',
-		description:
-			'List environment variables set on a Daytona sandbox. Required: id (sandbox ID or name)',
-		schema: v.object({
-			id: v.pipe(v.string(), v.minLength(1)),
-		}),
-	},
-	async ({ id }) => {
-		const args = ['sandbox', 'env', 'list', id, '--json'];
-
-		const result = await run_cli(args, QUICK_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				const env_vars = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(env_vars, null, 2));
-			} catch {
-				return tool.text(result.stdout);
-			}
-		} else {
-			return tool.error(
-				`Failed to list env vars (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
-
-/**
- * sandbox_env_set - Set environment variable for a sandbox
- */
-export const sandbox_env_set_tool = defineTool(
-	{
-		name: 'sandbox_env_set',
-		description:
-			'Set an environment variable in a sandbox shell session. Required: id (sandbox ID or name), key (variable name), value (variable value). Note: This only sets the variable in the current shell session. For persistent env vars, use --env flag when creating the sandbox.',
-		schema: v.object({
-			id: v.pipe(v.string(), v.minLength(1)),
-			key: v.pipe(v.string(), v.minLength(1)),
-			value: v.string(),
-		}),
-	},
-	async ({ id, key, value }) => {
-		const env_var = `${key}=${value}`;
-		const args = ['sandbox', 'env', 'set', id, env_var, '--json'];
-
-		const result = await run_cli(args, QUICK_TIMEOUT_MS);
-
-		if (result.exit_code === 0) {
-			try {
-				const set_result = JSON.parse(result.stdout);
-				return tool.text(JSON.stringify(set_result, null, 2));
-			} catch {
-				return tool.text(result.stdout || `Set ${key}=${value}`);
-			}
-		} else {
-			return tool.error(
-				`Failed to set env var (exit ${result.exit_code}):\n${result.stderr || result.stdout}`,
-			);
-		}
-	},
-);
+export function create_sandbox_tools(
+	get_signal: () => AbortSignal | undefined,
+) {
+	return sandbox_operations.map((operation) =>
+		defineTool<v.GenericSchema<Record<string, unknown>>>(
+			{
+				name: operation.name,
+				description: operation.description,
+				schema: operation.schema,
+			},
+			async (input) => {
+				try {
+					const result = await operation.execute(input, get_signal());
+					const failed =
+						!!result &&
+						typeof result === 'object' &&
+						(('exit_code' in result && result.exit_code !== 0) ||
+							('cleanup_error' in result && !!result.cleanup_error));
+					return failed
+						? tool.error(JSON.stringify(result))
+						: tool.text(JSON.stringify(result));
+				} catch (error) {
+					return tool.error(
+						error instanceof Error ? error.message : String(error),
+					);
+				}
+			},
+		),
+	);
+}

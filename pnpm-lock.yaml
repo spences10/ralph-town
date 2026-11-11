@@ -196,6 +196,9 @@ importers:
 
   packages/mcp-ralph-town:
     dependencies:
+      '@earendil-works/pi-codemode':
+        specifier: 1.5.0
+        version: 1.5.0
       '@tmcp/adapter-valibot':
         specifier: ^0.1.5
         version: 0.1.7(tmcp@1.20.1(typescript@7.0.2))(valibot@1.5.0(typescript@7.0.2))
@@ -387,6 +390,10 @@ packages:
 
   '@daytona/toolbox-api-client@0.230.0':
     resolution: {integrity: sha512-64QoWY8uzLeyuiuqhqvD8wD+UuWRbEFi83jrAo01QRZgc/goSaqp11q8wEAlAL3OW78aRGZdPdH/v4e5NMIq4g==}
+
+  '@earendil-works/pi-codemode@1.5.0':
+    resolution: {integrity: sha512-PLBJZ17AEWGzOlAAcFuOkw3PxkOti0JlFuZQyeF2GRTqbpuYo4k9t8YqUV2uOQVzrUnKdxahwaFUqc1eNS1WAg==}
+    engines: {node: '>=22.19.0'}
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -1971,6 +1978,9 @@ packages:
     resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
     engines: {node: '>=10'}
 
+  quickjs-wasi@3.6.2:
+    resolution: {integrity: sha512-FCqGtGOrMgzUiIrMNMA2YnsOxCNwo31dzqXvclXUC6xeT35NJLKXQJsvbeCTjvoFAwZgEAPg8U6+KAPDGXn8Mg==}
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -2627,6 +2637,10 @@ snapshots:
     transitivePeerDependencies:
       - debug
       - supports-color
+
+  '@earendil-works/pi-codemode@1.5.0':
+    dependencies:
+      quickjs-wasi: 3.6.2
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -3894,6 +3908,8 @@ snapshots:
       long: 5.3.2
 
   proxy-from-env@2.1.0: {}
+
+  quickjs-wasi@3.6.2: {}
 
   react-is@17.0.2: {}
 

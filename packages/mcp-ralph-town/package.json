@@ -29,6 +29,7 @@
 		"test:watch": "vp test watch"
 	},
 	"dependencies": {
+		"@earendil-works/pi-codemode": "1.5.0",
 		"@tmcp/adapter-valibot": "^0.1.5",
 		"@tmcp/transport-stdio": "*",
 		"ralph-town": "workspace:*",
@@ -36,6 +37,6 @@
 		"valibot": "^1.2.0"
 	},
 	"engines": {
-		"node": ">=22.12.0"
+		"node": ">=22.19.0"
 	}
 }

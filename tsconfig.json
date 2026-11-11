@@ -10,6 +10,9 @@
 		"resolveJsonModule": true,
 		"strict": true,
 		"skipLibCheck": true,
+		"paths": {
+			"ralph-town/operations": ["./packages/cli/src/operations.ts"]
+		},
 		"types": ["node", "vitest/globals"]
 	},
 	"include": [

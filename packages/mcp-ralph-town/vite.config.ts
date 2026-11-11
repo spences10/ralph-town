@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
@@ -9,6 +10,11 @@ export default defineConfig({
 		outExtensions: () => ({ js: '.js' }),
 	},
 	test: {
+		alias: {
+			'ralph-town/operations': fileURLToPath(
+				new URL('../cli/src/operations.ts', import.meta.url),
+			),
+		},
 		include: ['src/**/*.test.ts'],
 	},
 	fmt: {
