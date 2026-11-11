@@ -5,14 +5,14 @@
 
 import { defineCommand } from 'citty';
 import create from './create.js';
-import ssh from './ssh.js';
-import list from './list.js';
 import del from './delete.js';
+import env from './env.js';
 import exec from './exec.js';
+import health from './health.js';
+import list from './list.js';
 import preflight from './preflight.js';
 import snapshot from './snapshot/index.js';
-import env from './env.js';
-import health from './health.js';
+import ssh from './ssh.js';
 
 export default defineCommand({
 	meta: {
