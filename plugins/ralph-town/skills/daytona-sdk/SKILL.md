@@ -20,7 +20,12 @@ await sandbox.fs.uploadFile(
 
 - uploadFile takes `(Buffer, path)` not `(path, content)` - reversed
 - CodeLanguage only supports: `python`, `typescript`, `javascript`
-- Research via `gh search issues --repo daytonaio/daytona <query>`
+- Use `@daytona/sdk`, the renamed TypeScript package.
+- Check current Daytona docs and installed SDK declarations. The old
+  `daytonaio/daytona` repository stopped receiving updates in
+  June 2026.
+- Use `sandbox.updateEnv()` for variables inherited by newly spawned
+  processes; shell `export` in a one-off command does not persist.
 
 ## References
 

@@ -1,113 +1,60 @@
 # Daytona SDK API Gotchas
 
-## SANDBOX SSH - READ THIS FIRST
+## Current sources
 
-When working in a sandbox via SSH:
+Use `@daytona/sdk`. It replaces `@daytonaio/sdk` with the same API.
 
-1. **GH_TOKEN IS AVAILABLE** - don't check, just use `$GH_TOKEN`
-2. **USE FULL PATHS** - `/usr/bin/git` not `git`
-3. **WORK DIR** - `/home/daytona` not `/workspaces`
+Check the current
+[SDK docs](https://www.daytona.io/docs/en/typescript-sdk/) and
+installed package declarations before changing API usage. The old
+`daytonaio/daytona` repository stopped receiving updates in June 2026;
+its issues and PRs do not establish current behavior.
 
-**JUST RUN:**
+## Process execution
 
-```bash
-cd /home/daytona
+`executeCommand(command, cwd?, env?, timeout?)` returns combined
+output in `result`. Ralph-Town's disposable run wrapper preserves
+separate stdout/stderr streams and the command exit code.
 
-# Setup credentials FIRST (secure - keeps token out of URLs/logs)
-/usr/bin/git config --global credential.helper store
-echo "https://oauth2:$GH_TOKEN@github.com" > ~/.git-credentials
+Sessions expose separate streams, but the historical April 2026
+regressions in `docs/RESEARCH.md` need a new live test before changing
+the execution backend. Do not assume the old SSH, PATH or snapshot
+failures still apply.
 
-# Clone WITHOUT token in URL
-/usr/bin/git clone https://github.com/owner/repo.git
-```
+## Environment updates
 
-**DON'T WASTE TIME ON:**
+`sandbox.updateEnv({ KEY: 'value' })` updates the daemon environment
+for newly spawned processes, sessions and PTYs. It does not change
+already-running processes. A one-off shell `export` does not persist
+into later commands, and `sandbox.env` is creation-time metadata.
 
-- `echo $GH_TOKEN` - it's there, trust it
-- `which git` - PATH is broken, use full paths
-- checking if commands exist - just run them
+Local orchestration credentials are not automatically forwarded. Use
+`SANDBOX_GH_TOKEN` / `SANDBOX_ANTHROPIC_API_KEY` for sandbox
+credentials. Never assume a sandbox has a token just because the local
+orchestrator has one.
 
-**DON'T PUT TOKEN IN URL:**
+For credential-dependent commands, load only the required keys with
+`pnpx nopeek run`. Do not print credentials, put tokens into clone
+URLs, or bake them into snapshots.
 
-- BAD: `git clone https://$GH_TOKEN@github.com/...` (leaks to logs)
-- GOOD: Use credential helper as shown above
+## Retries and cleanup
 
-## CLI: Environment Variables Must Be Sourced
+Do not retry whole create or execute operations after an uncertain
+network response. The operation may already have run. The SDK provides
+connection-level retry handling.
 
-The `--env` flag uses shell expansion. Variables in `.env` won't
-expand unless sourced first.
+A creation timeout can include `DaytonaTimeoutError.sandboxId`.
+Retrieve that sandbox and attempt deletion rather than creating
+another one.
 
-**WRONG:**
+`ephemeral: true` means delete when stopped, not delete when a command
+finishes. Keep explicit cleanup for disposable runs.
 
-```bash
-# $GH_TOKEN is in .env but not exported - expands to empty string
-ralph-town sandbox create --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
-# Sandbox created with GH_TOKEN="" (empty!)
-```
+## Filesystem and images
 
-**CORRECT:**
+`uploadFile(Buffer.from(content), remote_path)` uploads content. With
+a string first argument, the SDK treats it as a local file path.
 
-```bash
-# Source .env first so variables are in shell environment
-source .env
-ralph-town sandbox create --env "SANDBOX_GH_TOKEN=$SANDBOX_GH_TOKEN"
-# Sandbox created with actual token value
-```
-
-## uploadFile Parameter Order
-
-**WRONG:**
-
-```typescript
-// This will fail with ENOENT
-await sandbox.fs.uploadFile('/path/to/file', content);
-```
-
-**CORRECT:**
-
-```typescript
-// Signature: uploadFile(content: Buffer, destination: string)
-await sandbox.fs.uploadFile(Buffer.from(content), '/path/to/file');
-```
-
-## CodeLanguage Enum
-
-From `libs/sdk-typescript/src/Daytona.ts`:
-
-```typescript
-export enum CodeLanguage {
-	PYTHON = 'python',
-	TYPESCRIPT = 'typescript',
-	JAVASCRIPT = 'javascript',
-}
-```
-
-No non-standard runtimes beyond the supported language enum values.
-
-## Research Commands
-
-Before implementing unfamiliar SDK features:
-
-```bash
-# Search issues
-gh search issues --repo daytonaio/daytona <query>
-
-# View specific issue
-gh issue view <number> --repo daytonaio/daytona
-
-# Search PRs
-gh pr list --repo daytonaio/daytona --search "<query>" --state all
-
-# View PR
-gh pr view <number> --repo daytonaio/daytona
-
-# Search code
-mcp__mcp-omnisearch__github_search query="repo:daytonaio/daytona <term>"
-```
-
-## Default Image Status
-
-- **PR #3241**: Adds Node.js, pnpm + Claude Agent SDK to default image
-  (open, changes requested)
-
-Until merged, use project snapshots for consistent tooling.
+Tool availability depends on the selected image. Ralph-Town's default
+image includes Node, git and pnpm; a custom image may not. Do not
+apply old PATH workarounds without checking the selected image.

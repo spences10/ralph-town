@@ -9,9 +9,9 @@ machine.
 ## Install
 
 ```bash
-npm install -g ralph-town
+pnpm add -g ralph-town
 # or
-npx ralph-town --help
+pnpx ralph-town --help
 ```
 
 ## One-shot runs
@@ -43,6 +43,34 @@ ralph-town run --json -- pnpx my-pi@latest --help
 - `sandbox delete` - Delete a sandbox
 - `sandbox env` - Manage sandbox environment variables
 - `sandbox snapshot` - Create/preflight reusable snapshots
+
+Disposable runs also enable Daytona's delete-on-stop fallback.
+`--keep` disables this fallback and skips explicit run cleanup. For
+manually managed sandboxes, `sandbox create --ephemeral` opts into
+delete-on-stop behavior.
+
+`sandbox env set <id> KEY=VALUE` updates the daemon environment for
+newly spawned processes, sessions and PTYs. Existing processes are
+unchanged. `sandbox env list <id>` reads the current process
+environment rather than creation-time metadata.
+
+## Shared operations
+
+The `ralph-town/operations` export provides the same host-side
+operations used by the CLI and MCP server, without starting the CLI:
+
+```typescript
+import { run_sandbox } from 'ralph-town/operations';
+
+const result = await run_sandbox({
+	command: 'node --version',
+	timeout: 120,
+});
+```
+
+Results include command exit status, separate stdout/stderr for
+disposable runs, and cleanup status. No orchestration credentials are
+automatically forwarded into sandboxes.
 
 ## Environment Variables
 

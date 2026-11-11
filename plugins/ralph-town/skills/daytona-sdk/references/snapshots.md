@@ -6,7 +6,7 @@ pre-installed.
 ## Creating Snapshots
 
 ```typescript
-import { Daytona, Image } from '@daytonaio/sdk';
+import { Daytona, Image } from '@daytona/sdk';
 
 const image = Image.base('debian:bookworm-slim')
 	.runCommands(

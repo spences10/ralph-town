@@ -3,8 +3,44 @@
 Current findings for Ralph-Town's disposable Daytona sandbox execution
 model.
 
-Last verified: 2026-04-24 against `@daytonaio/sdk@0.153.0` and the
-Daytona production API.
+SDK/source review: 2026-11-11 against `@daytona/sdk@0.230.0`. The old
+`@daytonaio/sdk` package was renamed with the same API. Version
+0.231.1 was available during review but was still inside this
+repository's dependency release-age window, so 0.230.0 is retained.
+
+Live sandbox results below are historical: last verified on 2026-04-24
+against `@daytonaio/sdk@0.153.0`. They have not been revalidated
+against the current production API.
+
+## Integration refresh
+
+- CLI and MCP now call shared functions from `ralph-town/operations`;
+  MCP no longer spawns the CLI.
+- MCP adds `search` and `execute` with local QuickJS orchestration.
+  Existing direct tools remain supported.
+- Environment updates use `sandbox.updateEnv()`. New processes,
+  sessions and PTYs inherit changes; running processes do not.
+  Environment listing reads a new process's environment because
+  `sandbox.env` contains creation metadata.
+- Whole-operation retries were removed. The current SDK already has
+  connection-level retries that distinguish safe retries from
+  potentially repeated side effects.
+- Creation timeouts can include `DaytonaTimeoutError.sandboxId`.
+  Ralph-Town uses it to attempt cleanup and reports cleanup failures.
+- Disposable runs enable `ephemeral: true` in addition to explicit
+  deletion. `--keep` disables both. Cancellation triggers host-side
+  cleanup, which can outlast the Code Mode deadline.
+- The stdout/stderr shell wrapper remains. Session execution needs a
+  fresh live regression test before replacing it.
+
+Current references:
+[SDK migration](https://www.npmjs.com/package/@daytonaio/sdk),
+[Sandbox API](https://www.daytona.io/docs/en/typescript-sdk/sandbox/),
+[Process API](https://www.daytona.io/docs/en/typescript-sdk/process/).
+
+The old `daytonaio/daytona` repository stopped receiving updates in
+June 2026. Prefer current docs and installed SDK source over its old
+issues when checking current behavior.
 
 ## Current conclusion
 
@@ -23,7 +59,7 @@ custom snapshot.
 ### Client and sandbox creation
 
 ```ts
-import { Daytona, Image } from '@daytonaio/sdk';
+import { Daytona, Image } from '@daytona/sdk';
 
 const daytona = new Daytona(); // reads DAYTONA_API_KEY by default
 
@@ -95,11 +131,11 @@ Ralph-Town now wraps commands so the remote shell redirects stdout and
 stderr to temp files, base64-encodes them, and returns parseable
 markers.
 
-`executeSessionCommand()` can separate stdout and stderr, but it is
-not reliable enough as the primary backend. In current tests it worked
-for pipes and heredocs but timed out on a command that printed to both
-streams and exited non-zero, matching recent upstream reports that
-session command handling has had edge cases.
+`executeSessionCommand()` separates stdout and stderr. In the April
+2026 tests it worked for pipes and heredocs but timed out on a command
+that printed to both streams and exited non-zero. That historical
+failure is why the wrapper remains; it is not a claim that the current
+production session API is still broken.
 
 ### Filesystem
 
@@ -214,15 +250,16 @@ until Corepack/pnpm setup was added by the image/snapshot.
 
 ## Ralph-Town execution architecture
 
-Current `ralph-town run` flow:
+Shared `ralph-town run` / MCP `sandbox_run` flow:
 
 ```text
-Local orchestrator
-├── Creates Daytona sandbox
-├── Optionally clones a repository in the sandbox
-├── Runs a wrapped shell command via sandbox.process.executeCommand()
-├── Parses stdout, stderr, exit code, and timeout status
-└── Deletes sandbox unless --keep is set
+CLI or MCP (direct tools / Code Mode)
+└── Shared host-side run operation
+    ├── Creates ephemeral Daytona sandbox
+    ├── Optionally clones a repository in the sandbox
+    ├── Runs a wrapped shell command via sandbox.process.executeCommand()
+    ├── Parses stdout, stderr, exit code, and timeout status
+    └── Deletes sandbox unless --keep is set
 ```
 
 The wrapper is needed because Daytona's direct command API currently

@@ -82,7 +82,7 @@ ralph-town sandbox snapshot create --json
 ## SDK Usage
 
 ```typescript
-import { Daytona, Image } from '@daytonaio/sdk';
+import { Daytona, Image } from '@daytona/sdk';
 
 const daytona = new Daytona();
 
