@@ -1,6 +1,6 @@
 {
 	"name": "ralph-town",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"description": "Disposable Daytona sandboxes for LLM evals and isolated command execution",
 	"license": "MIT",
 	"author": "Scott Spence",
