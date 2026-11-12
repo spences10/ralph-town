@@ -36,7 +36,7 @@
 		"test:watch": "vp test watch"
 	},
 	"dependencies": {
-		"@daytona/sdk": "0.230.0",
+		"@daytona/sdk": "0.231.1",
 		"citty": "^0.2.0"
 	},
 	"engines": {
